@@ -1,0 +1,2015 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Calidad — La Francesa</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=DM+Mono:wght@400;500&family=Nunito:wght@400;600;700;800&display=swap');
+
+/* ═══════════════════════════════════════════════════════
+   VARIABLES — paleta La Francesa + compatibilidad app
+═══════════════════════════════════════════════════════ */
+:root {
+  /* Paleta de marca */
+  --rojo:         #C8102E;
+  --rojo-osc:     #9A0B22;
+  --rojo-claro:   #E8213F;
+  --naranja:      #F47920;
+  --naranja-osc:  #D4661A;
+  --naranja-claro:#FF8F30;
+  --crema:        #FFF8F0;
+  --blanco:       #FFFFFF;
+  --gris-f:       #F5F0EB;
+  --gris-borde:   #E8DDD5;
+  --gris-text:    #7A6B62;
+  --text-osc:     #2C1810;
+
+  /* Variables que usa el JS/HTML inline — mapeadas a la paleta */
+  --bg:       #FFF8F0;
+  --surface:  #FFFFFF;
+  --surface2: #F5F0EB;
+  --border:   #E8DDD5;
+  --accent:   #F47920;
+  --red:      #C8102E;
+  --yellow:   #D4661A;
+  --blue:     #C8102E;
+  --text:     #2C1810;
+  --dim:      #7A6B62;
+}
+
+/* ── Reset ── */
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--crema);
+  color:var(--text-osc);
+  font-family:'Nunito',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 10% 0%,rgba(200,16,46,.05) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 100%,rgba(244,121,32,.07) 0%,transparent 60%);
+  pointer-events:none;z-index:0;
+}
+
+/* ── HEADER ── */
+header{
+  background:var(--rojo);
+  border-bottom:4px solid var(--naranja);
+  padding:0 26px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:200;min-height:66px;
+  box-shadow:0 4px 20px rgba(200,16,46,.3);
+}
+.logo{display:flex;align-items:center;gap:14px;cursor:pointer;}
+.logo-icon{
+  width:50px;height:50px;border-radius:10px;
+  overflow:hidden;background:white;padding:3px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.2);
+}
+.logo-icon img{width:100%;height:100%;object-fit:contain;}
+.logo h1{
+  font-family:'Playfair Display',serif;font-size:16px;font-weight:800;
+  color:white;letter-spacing:.3px;line-height:1.1;
+  text-shadow:0 1px 3px rgba(0,0,0,.2);
+}
+.logo p{font-family:'DM Mono',monospace;font-size:10px;color:rgba(255,255,255,.7);letter-spacing:1px;text-transform:uppercase;margin-top:2px;}
+
+/* Logo horizontal en header */
+.hdr-logo2{
+  height:38px;width:100px;
+  background:url('https://ik.imagekit.io/am3aa3uiq/la%20francesa.jpeg') center/contain no-repeat;
+  border-radius:6px;opacity:.9;flex-shrink:0;
+}
+
+/* Sync indicator */
+.sync-indicator{font-size:11px;font-family:'DM Mono',monospace;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:5px;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4);}
+.sync-dot.ok{background:#66BB6A;}
+.sync-dot.syncing{background:#FFE082;animation:pulse .7s infinite alternate;}
+.sync-dot.err{background:#EF9A9A;}
+@keyframes pulse{from{opacity:.4}to{opacity:1}}
+
+/* ── BOTONES ── */
+.btn{padding:8px 16px;border-radius:10px;border:none;font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;cursor:pointer;transition:all .18s;letter-spacing:.3px;}
+.btn-primary{background:var(--naranja);color:white;box-shadow:0 3px 10px rgba(244,121,32,.35);}
+.btn-primary:hover{background:var(--naranja-claro);transform:translateY(-2px);box-shadow:0 6px 16px rgba(244,121,32,.4);}
+.btn-secondary{background:white;color:var(--rojo);border:1.5px solid var(--gris-borde);box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.btn-secondary:hover{border-color:var(--naranja);color:var(--naranja-osc);background:#FFF4EC;}
+.btn-danger{background:transparent;color:var(--rojo);border:1.5px solid var(--rojo);}
+.btn-danger:hover{background:var(--rojo);color:white;}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+
+/* ── PÁGINAS ── */
+.page{display:none;position:relative;z-index:1;}
+.page.active{display:block;}
+
+/* ── HOME HERO ── */
+.home-hero{text-align:center;padding:50px 24px 36px;position:relative;}
+.home-hero::before{
+  content:'';display:block;width:140px;height:86px;
+  background:url('https://ik.imagekit.io/am3aa3uiq/la-francesa-ltda-logo_18190_220516102235.jpg') center/contain no-repeat;
+  margin:0 auto 22px;filter:drop-shadow(0 4px 12px rgba(200,16,46,.2));
+}
+.home-hero h2{
+  font-family:'Playfair Display',serif;font-size:42px;font-weight:900;
+  color:var(--rojo);margin-bottom:10px;letter-spacing:-.5px;
+  -webkit-background-clip:unset;-webkit-text-fill-color:unset;background:none;
+}
+.home-hero p{color:var(--gris-text);font-size:15px;margin-bottom:32px;font-weight:600;}
+.home-hero-btns{display:flex;gap:12px;justify-content:center;}
+.home-hero-btns .btn{padding:13px 28px;font-size:15px;}
+.home-hero::after{content:'';display:block;width:80px;height:4px;background:linear-gradient(90deg,var(--rojo),var(--naranja));border-radius:2px;margin:28px auto 0;}
+
+/* ── GALLETAS ── */
+.cookie-section{max-width:1100px;margin:0 auto;padding:0 22px 50px;}
+.section-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--rojo);margin-bottom:20px;display:flex;align-items:center;gap:8px;}
+.cookie-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;}
+.cookie-card{background:white;border:2px solid var(--gris-borde);border-radius:16px;padding:16px;cursor:pointer;transition:all .22s;position:relative;box-shadow:0 2px 12px rgba(200,16,46,.06);}
+.cookie-card:hover{border-color:var(--naranja);transform:translateY(-3px);box-shadow:0 8px 24px rgba(244,121,32,.18);}
+.cookie-photo{width:100%;height:125px;border-radius:10px;background:var(--gris-f);display:flex;align-items:center;justify-content:center;margin-bottom:12px;overflow:hidden;border:1px solid var(--gris-borde);}
+.cookie-photo img{width:100%;height:100%;object-fit:cover;}
+.cookie-photo-icon{font-size:40px;}
+.cookie-name{font-size:14px;font-weight:800;color:var(--text-osc);margin-bottom:5px;}
+.cookie-meta{font-size:11px;color:var(--gris-text);font-family:'DM Mono',monospace;line-height:1.7;}
+.cookie-weeks-badge{position:absolute;top:10px;right:10px;background:var(--rojo);color:white;border-radius:20px;padding:2px 10px;font-size:10px;font-family:'DM Mono',monospace;}
+
+/* ── WEEK LIST ── */
+#weekListPage{max-width:860px;margin:0 auto;padding:28px 22px;}
+.back-link{display:inline-flex;align-items:center;gap:5px;color:var(--gris-text);font-size:12px;font-family:'DM Mono',monospace;cursor:pointer;margin-bottom:22px;transition:.15s;}
+.back-link:hover{color:var(--naranja);}
+.week-page-header{display:flex;align-items:center;gap:18px;margin-bottom:28px;}
+.week-page-photo{width:84px;height:84px;border-radius:14px;background:white;border:2px solid var(--gris-borde);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:34px;flex-shrink:0;box-shadow:0 4px 12px rgba(200,16,46,.1);}
+.week-page-photo img{width:100%;height:100%;object-fit:cover;}
+.week-page-info h2{font-family:'Playfair Display',serif;font-size:24px;font-weight:800;color:var(--rojo);margin-bottom:3px;}
+.week-page-info p{color:var(--gris-text);font-size:12px;font-family:'DM Mono',monospace;}
+.week-list{display:flex;flex-direction:column;gap:10px;}
+.week-row{background:white;border:2px solid var(--gris-borde);border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .18s;box-shadow:0 1px 6px rgba(0,0,0,.04);}
+.week-row:hover{border-color:var(--naranja);box-shadow:0 4px 16px rgba(244,121,32,.15);}
+.week-row.locked{border-color:rgba(200,16,46,.3);}
+.week-row.locked:hover{border-color:var(--rojo);}
+.week-row-title{font-size:14px;font-weight:800;color:var(--text-osc);margin-bottom:3px;}
+.week-row-dates{font-size:11px;color:var(--gris-text);font-family:'DM Mono',monospace;}
+.week-row-right{display:flex;align-items:center;gap:8px;}
+.st-ok{color:#2E7D32;font-size:11px;font-family:'DM Mono',monospace;font-weight:700;}
+.st-locked{color:var(--rojo);font-size:11px;font-family:'DM Mono',monospace;font-weight:700;}
+.st-prog{color:var(--naranja-osc);font-size:11px;font-family:'DM Mono',monospace;font-weight:700;}
+.new-week-row{border:2px dashed var(--gris-borde);background:transparent;}
+.new-week-row:hover{border-color:var(--naranja);background:rgba(244,121,32,.03);}
+.new-week-row .week-row-title{color:var(--naranja-osc);}
+
+/* ── WORK PAGE ── */
+.breadcrumb{padding:10px 26px;background:white;border-bottom:1px solid var(--gris-borde);font-size:11px;font-family:'DM Mono',monospace;color:var(--gris-text);display:flex;align-items:center;gap:5px;flex-wrap:wrap;position:relative;z-index:1;}
+.bc-link{color:var(--rojo);cursor:pointer;font-weight:700;}
+.bc-link:hover{text-decoration:underline;color:var(--naranja-osc);}
+.locked-banner{background:rgba(200,16,46,.07);border-bottom:1px solid rgba(200,16,46,.2);padding:9px 26px;font-size:12px;color:var(--rojo);display:flex;align-items:center;gap:7px;font-weight:700;}
+
+main{max-width:1360px;margin:0 auto;padding:22px;display:grid;grid-template-columns:278px 1fr;gap:20px;position:relative;z-index:1;}
+.sidebar{display:flex;flex-direction:column;gap:13px;}
+.card{background:white;border:1.5px solid var(--gris-borde);border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(200,16,46,.05);}
+.card-title{font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--rojo);margin-bottom:12px;border-bottom:2px solid var(--naranja);padding-bottom:6px;}
+
+/* ── FORMS ── */
+label{display:block;font-size:11px;color:var(--gris-text);font-family:'DM Mono',monospace;margin-bottom:3px;margin-top:9px;}
+label:first-of-type{margin-top:0;}
+input[type=number],input[type=text],input[type=date],select,textarea{
+  width:100%;background:var(--gris-f);border:1.5px solid var(--gris-borde);border-radius:8px;
+  color:var(--text-osc);font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;padding:8px 10px;outline:none;transition:border-color .18s,box-shadow .18s;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--naranja);box-shadow:0 0 0 3px rgba(244,121,32,.1);}
+input:disabled,select:disabled,textarea:disabled{opacity:.42;cursor:not-allowed;}
+input[type=date]::-webkit-calendar-picker-indicator{filter:none;cursor:pointer;opacity:.6;}
+
+/* ── DAY PILLS ── */
+.day-pills{display:flex;flex-wrap:wrap;gap:5px;}
+.day-pill{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--gris-borde);background:var(--gris-f);color:var(--gris-text);transition:all .18s;position:relative;}
+.day-pill:hover{border-color:var(--naranja);color:var(--naranja-osc);}
+.day-pill.active{background:var(--rojo);color:white;border-color:var(--rojo);box-shadow:0 2px 8px rgba(200,16,46,.3);}
+.day-pill.has-data::after{content:'';position:absolute;top:2px;right:2px;width:5px;height:5px;border-radius:50%;background:var(--naranja);}
+.day-pill.active.has-data::after{background:white;}
+
+textarea.data-input{height:100px;resize:vertical;font-size:12px;line-height:1.6;}
+.hint{font-size:11px;color:var(--gris-text);font-family:'DM Mono',monospace;margin-top:4px;line-height:1.5;}
+
+/* ── STATS ── */
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--gris-borde);font-size:12px;}
+.stat-row:last-child{border-bottom:none;}
+.sl{color:var(--gris-text);font-family:'DM Mono',monospace;font-size:11px;}
+.sv{font-weight:800;font-family:'DM Mono',monospace;color:var(--text-osc);}
+.ok{color:#2E7D32!important;}
+.warn{color:var(--naranja-osc)!important;}
+.err{color:var(--rojo)!important;}
+
+/* ── CONTENT ── */
+.content{display:flex;flex-direction:column;gap:18px;}
+.chart-card{background:white;border:1.5px solid var(--gris-borde);border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(200,16,46,.05);}
+.chart-hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.chart-title{font-size:14px;font-weight:800;color:var(--text-osc);}
+.chart-sub{font-size:11px;color:var(--gris-text);font-family:'DM Mono',monospace;margin-top:2px;}
+.chart-wrap{position:relative;height:250px;}
+.empty-chart{display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--gris-text);gap:7px;font-size:13px;border:1.5px dashed var(--gris-borde);border-radius:10px;font-weight:600;}
+
+/* ── LEGEND ── */
+.legend{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px;}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;font-family:'DM Mono',monospace;color:var(--text-osc);}
+.leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.leg-line{width:18px;height:3px;border-radius:2px;flex-shrink:0;}
+.leg-dash{width:18px;height:0;border-top:2px dashed var(--naranja-osc);flex-shrink:0;}
+
+/* ── DATA TABLES ── */
+.day-table-section{margin-bottom:20px;border:1.5px solid var(--gris-borde);border-radius:10px;padding:14px;background:var(--gris-f);}
+.day-table-header{font-size:13px;font-weight:800;color:var(--rojo);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;}
+.day-table-meta{font-size:11px;color:var(--gris-text);font-family:'DM Mono',monospace;}
+.data-table{width:100%;border-collapse:collapse;font-size:11px;font-family:'DM Mono',monospace;margin-top:8px;}
+.data-table th{background:white;color:var(--rojo);text-align:left;padding:6px 8px;border-bottom:2px solid var(--gris-borde);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.5px;}
+.data-table td{padding:5px 8px;border-bottom:1px solid var(--gris-borde);color:var(--text-osc);}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table .td-num{text-align:right;font-variant-numeric:tabular-nums;}
+
+/* ── WEEK PROGRESS ── */
+.week-progress{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.wpd{background:var(--gris-f);border:1.5px solid var(--gris-borde);border-radius:9px;padding:7px 5px;text-align:center;transition:all .18s;}
+.wpd.filled{border-color:var(--naranja);background:rgba(244,121,32,.07);}
+.wpd-name{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--gris-text);margin-bottom:2px;}
+.wpd.filled .wpd-name{color:var(--naranja-osc);}
+.wpd-count{font-size:15px;font-weight:800;font-family:'DM Mono',monospace;}
+.wpd-avg{font-size:9px;font-family:'DM Mono',monospace;color:var(--gris-text);}
+
+/* ── MODALES ── */
+.modal{position:fixed;inset:0;background:rgba(44,24,16,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:500;padding:18px;}
+.modal.show{display:flex;}
+.modal-box{background:white;border:2px solid var(--gris-borde);border-top:4px solid var(--rojo);border-radius:16px;padding:26px;max-width:460px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(200,16,46,.18);}
+.modal-title{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:var(--rojo);margin-bottom:18px;}
+.modal-actions{display:flex;gap:9px;margin-top:18px;}
+.modal-actions .btn{flex:1;}
+.photo-upload-box{width:100%;height:160px;border:2px dashed var(--gris-borde);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.18s;margin-top:9px;overflow:hidden;position:relative;background:var(--gris-f);}
+.photo-upload-box:hover{border-color:var(--naranja);background:rgba(244,121,32,.03);}
+.photo-upload-box img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.pu-icon{font-size:28px;margin-bottom:5px;}
+.pu-text{font-size:12px;color:var(--gris-text);text-align:center;font-weight:600;}
+input[type=file]{display:none;}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:20px;right:20px;background:white;border:2px solid var(--naranja);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--naranja-osc);font-family:'DM Mono',monospace;font-weight:700;z-index:999;transform:translateY(60px);opacity:0;transition:all .26s;box-shadow:0 6px 20px rgba(244,121,32,.2);}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.terror{border-color:var(--rojo);color:var(--rojo);box-shadow:0 6px 20px rgba(200,16,46,.2);}
+
+/* ── IMPRESIÓN ── */
+@media print{
+  @page{size:355.6mm 215.9mm landscape;margin:5mm 8mm;}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  body{background:white!important;color:black!important;font-family:Arial,sans-serif;}
+  header,.breadcrumb,.locked-banner,.sidebar,.print-hide,.page:not(#workPage),#workPage .week-progress-wrap{display:none!important;}
+  #workPage{display:block!important;}
+  main{display:block!important;max-width:100%!important;padding:0!important;margin:0!important;}
+  .content{gap:4mm!important;display:block!important;}
+  .print-sheet{display:grid!important;grid-template-columns:55mm 1fr!important;gap:5mm!important;width:100%!important;height:calc(205.9mm - 10mm)!important;overflow:hidden!important;align-items:start!important;}
+  .print-info-col{display:flex!important;flex-direction:column!important;gap:0!important;overflow:hidden!important;}
+  .print-charts-col{display:flex!important;flex-direction:column!important;gap:3mm!important;height:100%!important;overflow:hidden!important;}
+  .print-charts-col.day-mode{display:flex!important;flex-direction:column!important;gap:3mm!important;}
+  .chart-card{background:white!important;border:1.5px solid #333!important;padding:3mm 3.5mm!important;margin:0!important;overflow:hidden!important;page-break-inside:avoid!important;}
+  .print-charts-col:not(.day-mode) .chart-card{flex:1!important;}
+  .chart-title{color:black!important;font-size:9.5pt!important;font-weight:700!important;}
+  .chart-sub{color:#555!important;font-size:7pt!important;}
+  .print-charts-col.day-mode #chartCard1 .chart-wrap{height:68mm!important;}
+  .print-charts-col.day-mode #chartCard1 canvas{max-height:68mm!important;}
+  .print-charts-col:not(.day-mode) .chart-wrap{height:72mm!important;}
+  .print-charts-col:not(.day-mode) canvas{max-height:72mm!important;}
+  .empty-chart{display:none!important;}
+  .legend{margin-bottom:2mm!important;flex-wrap:wrap!important;gap:4px!important;}
+  .leg-item{color:black!important;font-size:6.5pt!important;}
+  .leg-dot{width:8px;height:8px;}
+  .leg-line{width:12px;}
+  .leg-dash{width:12px;border-color:#333!important;}
+  .print-day-data-card{border:1.5px solid #333!important;padding:3mm 3.5mm!important;overflow:hidden!important;background:white!important;}
+  .print-week-summary-card{border:1.5px solid #333!important;padding:3mm 3.5mm!important;background:white!important;}
+  .print-week-summary-table{width:100%!important;border-collapse:collapse!important;font-size:7pt!important;font-family:Arial,sans-serif!important;}
+  .print-week-summary-table th{background:#eee!important;border:.5px solid #999!important;padding:1mm 1.5mm!important;font-size:6.5pt!important;font-weight:700!important;text-align:center!important;}
+  .print-week-summary-table td{border:.5px solid #ccc!important;padding:1mm 1.5mm!important;font-size:7pt!important;vertical-align:middle!important;text-align:center!important;}
+  .print-week-summary-table td:first-child{text-align:left!important;font-weight:700!important;}
+}
+.print-sheet{display:none;}
+.print-info-col{display:none;}
+.print-charts-col{display:none;}
+.print-sheet-header{display:none;background:white;color:#111;border:2px solid #111;padding:2.5mm 4mm;border-radius:3mm;margin-bottom:3mm;}
+.print-sheet-header .psh-inner{display:flex;align-items:center;gap:4mm;}
+.print-sheet-header .psh-logo{width:18mm;height:18mm;object-fit:contain;flex-shrink:0;}
+.print-sheet-header .psh-text{}
+.print-sheet-header h1{font-size:9.5pt;font-weight:800;margin-bottom:0.5mm;color:#111;line-height:1.2;}
+.print-sheet-header p{font-size:7pt;color:#555;}
+.print-info-table{display:none;width:100%;border-collapse:collapse;font-size:8.5pt;font-family:Arial;}
+.print-info-table td{padding:2mm 2mm;border-bottom:1px solid #ddd;vertical-align:top;color:black;}
+.print-info-table td:first-child{font-weight:700;color:#333;width:45%;}
+.print-info-section{display:none;font-size:8pt;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:.8px;padding:3mm 0 1mm;border-top:2px solid #333;margin-top:2mm;}
+.print-day-pattern{display:inline-block;width:11px;height:11px;margin-right:3px;vertical-align:middle;border:1px solid #000;}
+.print-day-pattern.p0{background:repeating-linear-gradient(45deg,#000,#000 1.5px,transparent 1.5px,transparent 3px);}
+.print-day-pattern.p1{background:repeating-linear-gradient(-45deg,#000,#000 1.5px,transparent 1.5px,transparent 3px);}
+.print-day-pattern.p2{background:repeating-linear-gradient(90deg,#000,#000 1.5px,transparent 1.5px,transparent 3px);}
+.print-day-pattern.p3{background:repeating-linear-gradient(0deg,#000,#000 1.5px,transparent 1.5px,transparent 3px);}
+.print-day-pattern.p4{background:radial-gradient(circle,#000 .8px,transparent .8px);background-size:3.5px 3.5px;}
+.print-day-pattern.p5{background:#000;}
+@media(max-width:900px){main{grid-template-columns:1fr;}.hdr-logo2{display:none;}}
+
+/* ══════════════════════════════════════════════════
+   CONTRAMUESTRAS
+══════════════════════════════════════════════════ */
+/* Tabla de contramuestras */
+.cm-table-wrap{overflow-x:auto;margin-top:14px;}
+.cm-table{width:100%;border-collapse:collapse;font-size:12px;font-family:'Nunito',sans-serif;}
+.cm-table th{
+  background:var(--rojo);color:white;
+  padding:8px 10px;text-align:left;font-size:10px;
+  font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  white-space:nowrap;
+}
+.cm-table th:first-child{border-radius:8px 0 0 0;}
+.cm-table th:last-child{border-radius:0 8px 0 0;}
+.cm-table td{
+  padding:8px 10px;border-bottom:1px solid var(--gris-borde);
+  vertical-align:middle;color:var(--text-osc);font-weight:600;
+  white-space:nowrap;
+}
+.cm-table tr:last-child td{border-bottom:none;}
+.cm-table tr:hover td{background:var(--gris-f);}
+
+/* Badges de estado */
+.cm-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:3px 10px;border-radius:20px;
+  font-size:10px;font-weight:800;letter-spacing:.4px;
+}
+.cm-badge.vigente{background:#E8F5E9;color:#2E7D32;border:1.5px solid #A5D6A7;}
+.cm-badge.vencido{background:#FFEBEE;color:#C62828;border:1.5px solid #EF9A9A;animation:pulse-red 1.5s infinite alternate;}
+.cm-badge.desechado{background:#F5F5F5;color:#757575;border:1.5px solid #BDBDBD;}
+@keyframes pulse-red{from{box-shadow:0 0 0 0 rgba(198,40,40,0)}to{box-shadow:0 0 0 4px rgba(198,40,40,.18)}}
+
+/* Botón desechar */
+.btn-desechar{
+  padding:3px 9px;border-radius:6px;border:1.5px solid #bbb;
+  background:white;color:#757575;font-size:10px;font-weight:700;
+  cursor:pointer;transition:all .18s;font-family:'Nunito',sans-serif;
+}
+.btn-desechar:hover{border-color:var(--rojo);color:var(--rojo);background:#fff5f5;}
+.btn-desechar.done{opacity:.45;cursor:not-allowed;}
+
+/* Alerta de vencidos */
+.cm-alert{
+  display:none;
+  background:linear-gradient(135deg,#fff5f5,#ffebee);
+  border:2px solid var(--rojo);border-radius:12px;
+  padding:12px 18px;margin-bottom:18px;
+  display:flex;align-items:flex-start;gap:10px;
+}
+.cm-alert.hidden{display:none!important;}
+.cm-alert-icon{font-size:22px;flex-shrink:0;margin-top:1px;}
+.cm-alert-body{}
+.cm-alert-title{font-weight:800;color:var(--rojo);font-size:13px;margin-bottom:3px;}
+.cm-alert-list{font-size:11px;color:var(--rojo-osc);font-family:'DM Mono',monospace;line-height:1.7;}
+
+/* Filtros */
+.cm-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.cm-filter-btn{
+  padding:5px 14px;border-radius:20px;border:1.5px solid var(--gris-borde);
+  background:white;color:var(--gris-text);font-size:11px;font-weight:700;
+  cursor:pointer;transition:all .18s;font-family:'Nunito',sans-serif;
+}
+.cm-filter-btn:hover{border-color:var(--naranja);color:var(--naranja-osc);}
+.cm-filter-btn.active{background:var(--rojo);color:white;border-color:var(--rojo);}
+.cm-count{
+  margin-left:auto;font-size:11px;color:var(--gris-text);
+  font-family:'DM Mono',monospace;
+}
+
+/* Empty state */
+.cm-empty{
+  text-align:center;padding:48px 20px;color:var(--gris-text);
+}
+.cm-empty-icon{font-size:44px;margin-bottom:10px;}
+.cm-empty-txt{font-size:14px;font-weight:600;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo" onclick="goHome()">
+    <div class="logo-icon"><img src="https://ik.imagekit.io/am3aa3uiq/la-francesa-ltda-logo_18190_220516102235.jpg" alt="La Francesa Logo" onerror="this.style.display='none';this.parentNode.innerHTML='⚖️'"></div>
+    <div>
+      <h1>Control de Calidad — La Francesa</h1>
+      <p>Sistema de Pesos · Norma QC</p>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px">
+    <div class="sync-indicator" id="syncIndicator">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">Conectando...</span>
+    </div>
+    <div class="hdr-btns" id="hdrBtns"></div>
+  </div>
+</header>
+
+<!-- HOME -->
+<div class="page active" id="homePage">
+  <div class="home-hero">
+    <h2>Control de Calidad</h2>
+    <p>Gestión de pesos por tipo de galleta y semana</p>
+    <div class="home-hero-btns">
+      <button class="btn btn-primary" onclick="askPwd()">➕ Nueva Galleta</button>
+      <button class="btn btn-secondary" onclick="goContramuestras()" style="background:white;border:2px solid var(--naranja);color:var(--naranja-osc)">🧪 Registro de Contramuestras</button>
+    </div>
+  </div>
+  <div class="cookie-section">
+    <div class="section-title">🍪 Galletas Registradas</div>
+    <div class="cookie-grid" id="cookieGrid"></div>
+  </div>
+</div>
+
+<!-- WEEK LIST -->
+<div class="page" id="weekListPage">
+  <div id="weekListInner" style="max-width:860px;margin:0 auto;padding:28px 22px;">
+    <div class="back-link" onclick="goHome()">← Inicio</div>
+    <div class="week-page-header">
+      <div class="week-page-photo" id="wlPhoto"></div>
+      <div class="week-page-info">
+        <h2 id="wlCookieName"></h2>
+        <p id="wlCookieMeta"></p>
+      </div>
+    </div>
+    <div class="section-title" style="font-size:17px">📅 Semanas de Empaquetado</div>
+    <div class="week-list" id="weekList"></div>
+  </div>
+</div>
+
+<!-- WORK PAGE -->
+<div class="page" id="workPage">
+  <div class="print-sheet" id="printSheet">
+    <div class="print-info-col">
+      <div class="print-sheet-header" id="pshHeader">
+        <div class="psh-inner">
+          <img class="psh-logo" src="https://ik.imagekit.io/am3aa3uiq/la-francesa-ltda-logo_18190_220516102235.jpg"
+               onerror="this.style.display='none'" alt="La Francesa">
+          <div class="psh-text">
+            <h1>Control de Calidad — La Francesa</h1>
+            <p id="pshSub"></p>
+          </div>
+        </div>
+      </div>
+      <div class="print-info-section">Galleta</div>
+      <table class="print-info-table" id="pTableGalleta"></table>
+      <div class="print-info-section">Lote del día</div>
+      <table class="print-info-table" id="pTableLote"></table>
+      <div class="print-info-section">Estadísticas</div>
+      <table class="print-info-table" id="pTableStats"></table>
+    </div>
+    <div class="print-charts-col" id="pChartsCol"></div>
+  </div>
+
+  <div id="screenContent">
+    <div class="breadcrumb" id="breadcrumb"></div>
+    <div class="locked-banner" id="lockedBanner" style="display:none">🔒 Esta semana está cerrada — solo lectura</div>
+    <main>
+      <div class="sidebar print-hide">
+        <div class="card">
+          <div class="card-title">🍪 Información</div>
+          <div id="cookieInfo"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 Día de captura</div>
+          <div class="day-pills" id="dayPills"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📦 Lote del día seleccionado</div>
+          <label>Número de lote</label>
+          <input type="text" id="fieldLote" placeholder="Ej: L2025-031">
+          <label>Fecha de empaquetado</label>
+          <input type="date" id="fieldFechaEmpaque">
+          <label>Fecha de vencimiento</label>
+          <input type="date" id="fieldFechaVence">
+          <button class="btn btn-primary btn-sm" style="width:100%;margin-top:9px" onclick="saveLoteInfo()">Guardar</button>
+        </div>
+        <div class="card">
+          <div class="card-title">📥 Ingresar datos</div>
+          <textarea class="data-input" id="dataInput" placeholder="Pega los pesos aquí...&#10;(columna de Excel, comas, espacios...)"></textarea>
+          <div class="hint">⚡ Cualquier cantidad · Se resta empaque automático</div>
+          <button class="btn btn-primary" style="width:100%;margin-top:9px" onclick="cargarDatos()">➕ Cargar datos</button>
+          <button class="btn btn-danger btn-sm" style="width:100%;margin-top:5px" onclick="borrarDia()">🗑 Borrar día</button>
+        </div>
+        <div class="card">
+          <div class="card-title">📊 Estadísticas</div>
+          <div id="statsContent"><div class="hint" style="text-align:center;padding:8px">Sin datos</div></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="chart-card print-hide">
+          <div class="chart-hdr">
+            <div>
+              <div class="chart-title">Progreso semanal</div>
+              <div class="chart-sub" id="progSubtitle">0 de 6 días</div>
+            </div>
+          </div>
+          <div class="week-progress" id="weekProgress"></div>
+        </div>
+        <div class="chart-card" id="chartCard1">
+          <div class="chart-hdr">
+            <div>
+              <div class="chart-title" id="chartDayTitle">Mediciones de la semana</div>
+              <div class="chart-sub" id="chartDaySub" style="display:none">Pesos netos · Cada día reinicia en muestra #1</div>
+            </div>
+          </div>
+          <div class="legend" id="chartLegend1"></div>
+          <div class="chart-wrap">
+            <canvas id="chartDiario"></canvas>
+            <div class="empty-chart" id="emptyDiario" style="position:absolute;inset:0;">
+              <div style="font-size:30px">📈</div><div>Carga datos para ver la gráfica</div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-card" id="chartCard2">
+          <div class="chart-hdr">
+            <div>
+              <div class="chart-title">Promedios diarios <span id="chartWDayBadge" style="font-size:11px;font-weight:600;color:var(--accent);margin-left:6px"></span></div>
+              <div class="chart-sub">Gráfica semanal de control</div>
+            </div>
+          </div>
+          <div class="legend">
+            <div class="leg-item"><div class="leg-dot" style="background:var(--accent)"></div>Dentro norma</div>
+            <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Fuera límite</div>
+            <div class="leg-item"><div class="leg-line" style="background:var(--accent)"></div>Ideal</div>
+            <div class="leg-item"><div class="leg-dash"></div>Límites</div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="chartSemanal"></canvas>
+            <div class="empty-chart" id="emptySemanal" style="position:absolute;inset:0;">
+              <div style="font-size:30px">📅</div><div>Se construye día a día</div>
+            </div>
+          </div>
+        </div>
+        <div class="chart-card print-hide">
+          <div class="chart-hdr">
+            <div>
+              <div class="chart-title">Datos de la semana</div>
+              <div class="chart-sub">Pesos brutos (con empaque) y pesos netos por día</div>
+            </div>
+          </div>
+          <div id="dataTables"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- MODAL: Password -->
+<div class="modal" id="modalPwd">
+  <div class="modal-box" style="max-width:340px">
+    <div class="modal-title">🔐 Acceso Restringido</div>
+    <p style="font-size:13px;color:var(--dim);margin-bottom:12px">Contraseña requerida para crear una nueva galleta.</p>
+    <label>Contraseña</label>
+    <input type="password" id="pwdInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkPwd()">
+    <div id="pwdErr" style="color:var(--red);font-size:11px;font-family:'DM Mono',monospace;margin-top:5px;display:none">Contraseña incorrecta</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeM('modalPwd')">Cancelar</button>
+      <button class="btn btn-primary" onclick="checkPwd()">Ingresar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New Cookie -->
+<div class="modal" id="modalNC">
+  <div class="modal-box">
+    <div class="modal-title">➕ Nueva Galleta</div>
+    <label>Nombre de la galleta</label>
+    <input type="text" id="ncName" placeholder="Ej: Galleta Chispas Chocolate">
+    <label>Peso del empaque (g)</label>
+    <input type="number" id="ncEmpaque" value="12" step="0.1">
+    <label>Peso ideal / nominal (g)</label>
+    <input type="number" id="ncIdeal" value="500" step="0.1">
+    <label>Límite inferior (g)</label>
+    <input type="number" id="ncLimInf" value="490" step="0.1">
+    <label>Límite superior (g)</label>
+    <input type="number" id="ncLimSup" value="510" step="0.1">
+    <label>URL de imagen (opcional)</label>
+    <input type="text" id="ncPhotoUrl" placeholder="https://ejemplo.com/imagen.jpg" oninput="prevUrl()">
+    <div id="ncPhotoPreview" style="display:none;margin-top:8px;border-radius:8px;overflow:hidden;height:110px;border:1.5px solid var(--gris-borde)"><img id="ncPhotoImg" style="width:100%;height:100%;object-fit:cover"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeM('modalNC')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createCookie()">Crear Galleta</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New Week -->
+<div class="modal" id="modalNW">
+  <div class="modal-box" style="max-width:380px">
+    <div class="modal-title">📅 Nueva Semana</div>
+    <p style="font-size:11px;color:var(--dim);margin-bottom:12px;font-family:'DM Mono',monospace">El número de semana se calcula automáticamente según el calendario ISO.</p>
+    <label>Fecha de inicio (Lunes)</label>
+    <input type="date" id="nwStart" oninput="previewWeek()">
+    <div id="nwPreview" style="margin-top:10px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent);min-height:18px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeM('modalNW')">Cancelar</button>
+      <button class="btn btn-primary" onclick="createWeek()">Crear Semana</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     PÁGINA: CONTRAMUESTRAS
+════════════════════════════════════════════ -->
+<div class="page" id="cmPage">
+  <div style="max-width:1100px;margin:0 auto;padding:28px 22px;">
+
+    <!-- Header de sección -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+      <div>
+        <div class="back-link" onclick="goHome()">← Inicio</div>
+        <div class="section-title" style="margin-bottom:0">🧪 Registro de Contramuestras</div>
+        <div style="font-size:12px;color:var(--gris-text);font-family:'DM Mono',monospace;margin-top:3px">
+          Control de muestras retenidas para trazabilidad
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="openModalCM()">➕ Nueva Contramuestra</button>
+    </div>
+
+    <!-- Alerta de vencidos -->
+    <div class="cm-alert hidden" id="cmAlert">
+      <div class="cm-alert-icon">🚨</div>
+      <div class="cm-alert-body">
+        <div class="cm-alert-title">Contramuestras vencidas sin desechar</div>
+        <div class="cm-alert-list" id="cmAlertList"></div>
+      </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="cm-filters">
+      <button class="cm-filter-btn active" onclick="setCMFilter('todos',this)">Todos</button>
+      <button class="cm-filter-btn" onclick="setCMFilter('vigente',this)">✅ Vigentes</button>
+      <button class="cm-filter-btn" onclick="setCMFilter('vencido',this)">🔴 Vencidos</button>
+      <button class="cm-filter-btn" onclick="setCMFilter('desechado',this)">⚫ Desechados</button>
+      <span class="cm-count" id="cmCount"></span>
+    </div>
+
+    <!-- Tabla -->
+    <div style="background:white;border:1.5px solid var(--gris-borde);border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(200,16,46,.05);">
+      <div class="cm-table-wrap">
+        <table class="cm-table" id="cmTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Producto</th>
+              <th>Lote</th>
+              <th>F. Producción</th>
+              <th>F. Vencimiento</th>
+              <th>Cantidad</th>
+              <th>Estado</th>
+              <th>Observaciones</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="cmTbody"></tbody>
+        </table>
+        <div class="cm-empty hidden" id="cmEmpty">
+          <div class="cm-empty-icon">🧪</div>
+          <div class="cm-empty-txt">No hay contramuestras registradas</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL: Nueva Contramuestra -->
+<div class="modal" id="modalCM">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-title" id="modalCMTitle">🧪 Nueva Contramuestra</div>
+    <input type="hidden" id="cmEditId">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;">
+      <div>
+        <label>N° Muestra <span style="font-size:9px;color:var(--gris-text)">(automático)</span></label>
+        <input type="text" id="cmNum" placeholder="CM-001" style="background:#f0f0f0;font-weight:800;color:var(--rojo)" readonly>
+      </div>
+      <div>
+        <label>Cantidad</label>
+        <input type="text" id="cmCantidad" placeholder="Ej: 200g / 3 unidades">
+      </div>
+    </div>
+
+    <label>Producto</label>
+    <input type="text" id="cmProducto" placeholder="Ej: Galleta Chispas Chocolate">
+
+    <label>Lote</label>
+    <input type="text" id="cmLote" placeholder="Ej: L2025-031">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;">
+      <div>
+        <label>Fecha de Producción</label>
+        <input type="date" id="cmFProd">
+      </div>
+      <div>
+        <label>Fecha de Vencimiento</label>
+        <input type="date" id="cmFVenc">
+      </div>
+    </div>
+
+    <label>Observaciones</label>
+    <textarea id="cmObs" style="height:70px;resize:vertical" placeholder="Notas adicionales..."></textarea>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeM('modalCM')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCM()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURACIÓN SUPABASE
+//  ⚠️  Reemplaza estos valores con los de tu proyecto
+// ═══════════════════════════════════════════════════════════
+const SUPABASE_URL = 'https://jtnkknoioxprrfxyrrwh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0bmtrbm9pb3hwcnJmeHlycndoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE2Mjg4OTMsImV4cCI6MjA4NzIwNDg5M30.-cNZhQCd7GeF0Mym-d0q6m05G7iNMsUVZ_syZUx7FOg';
+
+// Detecta si las credenciales ya fueron configuradas
+const SUPABASE_CONFIGURED = 
+  SUPABASE_URL !== 'https://TU_PROYECTO.supabase.co' &&
+  SUPABASE_ANON_KEY !== 'TU_ANON_KEY_AQUI' &&
+  SUPABASE_URL.includes('.supabase.co');
+
+const _supa = SUPABASE_CONFIGURED
+  ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+
+// ═══════════════════════════════════════════════════════════
+//  CONSTANTES
+// ═══════════════════════════════════════════════════════════
+const DAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const DS=['LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+const DCOL=['#60a5fa','#34d399','#f59e0b','#ec4899','#8b5cf6','#14b8a6'];
+// Estilos de línea por día (B&W friendly: grosor + dash distintos)
+const DSTYLE=[
+  {bw:'#111', bwdash:[],           bwWidth:3.5, pointR:5,   pointStyle:'circle'},   // Lunes: sólida gruesa
+  {bw:'#111', bwdash:[6,4],        bwWidth:2.5, pointR:4,   pointStyle:'circle'},   // Martes: guión
+  {bw:'#111', bwdash:[2,3],        bwWidth:3,   pointR:4,   pointStyle:'rectRot'},  // Miércoles: puntos
+  {bw:'#111', bwdash:[10,3,2,3],   bwWidth:2,   pointR:5,   pointStyle:'triangle'}, // Jueves: raya-punto
+  {bw:'#111', bwdash:[1,1],        bwWidth:1.5, pointR:3.5, pointStyle:'rect'},     // Viernes: fina punteada
+  {bw:'#111', bwdash:[12,4],       bwWidth:2.5, pointR:4,   pointStyle:'cross'},    // Sábado: raya larga
+];
+const PWD='lafrancesaccalidad';
+
+// Estado local en memoria (igual que antes, se sincroniza con Supabase)
+let S={cookies:{},cur:{cookie:null,week:null,day:0}};
+let chartD=null,chartW=null;
+
+// ── Indicador de sincronización ────────────────────────────
+function setSyncStatus(status, label){
+  const dot=document.getElementById('syncDot');
+  const lbl=document.getElementById('syncLabel');
+  dot.className='sync-dot '+status;
+  lbl.textContent=label;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CAPA DE DATOS — Supabase
+// ═══════════════════════════════════════════════════════════
+
+// Cargar todas las galletas desde Supabase al iniciar
+async function loadFromSupabase(){
+  // Si Supabase no está configurado, usar solo localStorage
+  if(!SUPABASE_CONFIGURED){
+    const dot=document.getElementById('syncDot');
+    dot.style.background='#F47920'; dot.className='sync-dot';
+    document.getElementById('syncLabel').textContent='⚠ Modo local — configura Supabase';
+    try{ const s=localStorage.getItem('qcv4'); if(s) S=JSON.parse(s); }catch(e){}
+    renderHome();
+    return;
+  }
+  setSyncStatus('syncing','Cargando...');
+  try {
+    // Cargar galletas
+    const {data:galletas, error:e1} = await _supa.from('galletas').select('*');
+    if(e1) throw e1;
+
+    S.cookies={};
+    for(const g of galletas){
+      const cid=g.id;
+      S.cookies[cid]={
+        name: g.nombre,
+        empaque: parseFloat(g.empaque_g),
+        ideal: parseFloat(g.ideal_g),
+        limInf: parseFloat(g.lim_inf_g),
+        limSup: parseFloat(g.lim_sup_g),
+        photo: g.foto_url||g.foto_base64||null,  // compatible con ambas versiones del SQL
+        weeks: {}
+      };
+    }
+
+    // Cargar semanas
+    const {data:semanas, error:e2} = await _supa.from('semanas').select('*');
+    if(e2) throw e2;
+
+    for(const sem of semanas){
+      const cid=sem.galleta_id;
+      if(!S.cookies[cid]) continue;
+      S.cookies[cid].weeks[sem.id]={
+        weekNum: sem.semana_num,
+        year: sem.anio,
+        dateStart: sem.fecha_ini,
+        dateEnd: sem.fecha_fin,
+        locked: sem.bloqueada,
+        data: {0:[],1:[],2:[],3:[],4:[],5:[]},
+        dayInfo: {
+          0:{lote:'',fechaEmpaque:'',fechaVence:''},
+          1:{lote:'',fechaEmpaque:'',fechaVence:''},
+          2:{lote:'',fechaEmpaque:'',fechaVence:''},
+          3:{lote:'',fechaEmpaque:'',fechaVence:''},
+          4:{lote:'',fechaEmpaque:'',fechaVence:''},
+          5:{lote:'',fechaEmpaque:'',fechaVence:''}
+        }
+      };
+    }
+
+    // Cargar lotes por día
+    const {data:lotes, error:e3} = await _supa.from('lotes_dia').select('*');
+    if(e3) throw e3;
+    for(const l of lotes){
+      const sem=findWeek(l.semana_id);
+      if(!sem) continue;
+      sem.dayInfo[l.dia_index]={
+        lote: l.lote||'',
+        fechaEmpaque: l.fecha_empaque||'',
+        fechaVence: l.fecha_vence||''
+      };
+    }
+
+    // Cargar muestras
+    const {data:muestras, error:e4} = await _supa.from('muestras').select('*').order('dia_index').order('muestra_num');
+    if(e4) throw e4;
+    for(const m of muestras){
+      const sem=findWeek(m.semana_id);
+      if(!sem) continue;
+      if(!sem.data[m.dia_index]) sem.data[m.dia_index]=[];
+      sem.data[m.dia_index].push(parseFloat(m.peso_neto_g));
+    }
+
+    setSyncStatus('ok','Sincronizado ✓');
+    console.log('✅ Supabase conectado. Galletas:', Object.keys(S.cookies).length);
+    renderHome();
+  } catch(err){
+    console.error('Error cargando desde Supabase:', err);
+    setSyncStatus('err','Sin conexión');
+    // Caer a localStorage como respaldo
+    try{ const s=localStorage.getItem('qcv4'); if(s) S=JSON.parse(s); }catch(e){}
+    renderHome();
+    toast('⚠ Error Supabase: '+(err.message||err.code||JSON.stringify(err)),true);
+    console.error('Detalle error Supabase:', JSON.stringify(err));
+  }
+}
+
+function findWeek(semanaId){
+  for(const cid in S.cookies){
+    const w=S.cookies[cid].weeks[semanaId];
+    if(w) return w;
+  }
+  return null;
+}
+
+// Guardar estado en localStorage como respaldo siempre
+function saveLocal(){ localStorage.setItem('qcv4',JSON.stringify(S)); }
+
+// ── Guardar galleta en Supabase ────────────────────────────
+async function saveGalletaDB(id, cookie){
+  if(!SUPABASE_CONFIGURED) return true; // sin Supabase, siempre OK
+  setSyncStatus('syncing','Guardando...');
+  const galletaData = {
+    id,
+    nombre: cookie.name,
+    empaque_g: cookie.empaque,
+    ideal_g: cookie.ideal,
+    lim_inf_g: cookie.limInf,
+    lim_sup_g: cookie.limSup,
+    foto_url: cookie.photo||null
+  };
+  const {error} = await _supa.from('galletas').upsert(galletaData);
+  if(error){
+    // Si falla por foto_url (columna vieja), intenta con foto_base64
+    if(error.message && error.message.includes('foto_url')){
+      const fallback={...galletaData, foto_base64:galletaData.foto_url};
+      delete fallback.foto_url;
+      const {error:e2}=await _supa.from('galletas').upsert(fallback);
+      if(e2){ setSyncStatus('err','Error'); toast('⚠ Error Supabase: '+e2.message,true); return true; }
+    } else {
+      setSyncStatus('err','Error al guardar'); toast('⚠ Error Supabase: '+error.message,true); return true;
+    }
+  }
+  setSyncStatus('ok','Guardado ✓');
+  return true;
+}
+
+// ── Guardar semana en Supabase ─────────────────────────────
+async function saveSemanoDB(weekId, galleta_id, week){
+  if(!SUPABASE_CONFIGURED) return true;
+  setSyncStatus('syncing','Guardando...');
+  const {error} = await _supa.from('semanas').upsert({
+    id: weekId,
+    galleta_id,
+    semana_num: week.weekNum,
+    anio: week.year,
+    fecha_ini: week.dateStart,
+    fecha_fin: week.dateEnd,
+    bloqueada: week.locked||false
+  });
+  if(error){ setSyncStatus('err','Error'); toast('⚠ Error guardando semana: '+error.message,true); }
+  else setSyncStatus('ok','Guardado ✓');
+  return true;
+}
+
+// ── Guardar lote de un día ─────────────────────────────────
+async function saveLoteDB(semanaId, diaIndex, di){
+  if(!SUPABASE_CONFIGURED) return;
+  const {error} = await _supa.from('lotes_dia').upsert({
+    semana_id: semanaId,
+    dia_index: diaIndex,
+    lote: di.lote||null,
+    fecha_empaque: di.fechaEmpaque||null,
+    fecha_vence: di.fechaVence||null
+  },{onConflict:'semana_id,dia_index'});
+  if(error) toast('⚠ Error guardando lote: '+error.message,true);
+}
+
+// ── Guardar muestras de un día (reemplaza las del día) ─────
+async function saveMuestrasDB(semanaId, galleta_id, diaIndex, netos, empaque, limInf, limSup){
+  if(!SUPABASE_CONFIGURED){ setSyncStatus('',''); return; }
+  setSyncStatus('syncing','Guardando muestras...');
+  // Borrar muestras previas de ese día
+  await _supa.from('muestras').delete().match({semana_id:semanaId, dia_index:diaIndex});
+
+  if(!netos.length){ setSyncStatus('ok','Guardado ✓'); return; }
+
+  const rows = netos.map((neto,i)=>({
+    semana_id: semanaId,
+    galleta_id,
+    dia_index: diaIndex,
+    muestra_num: i+1,
+    peso_bruto_g: parseFloat((neto+empaque).toFixed(4)),
+    peso_neto_g: parseFloat(neto.toFixed(4)),
+    fuera_limite: neto<limInf || neto>limSup
+  }));
+
+  const {error} = await _supa.from('muestras').insert(rows);
+  if(error){ setSyncStatus('err','Error'); toast('⚠ Error guardando muestras: '+error.message,true); }
+  else setSyncStatus('ok','Guardado ✓');
+}
+
+// ── Actualizar estado bloqueado ────────────────────────────
+async function updateBloqueadoDB(semanaId, bloqueada){
+  if(!SUPABASE_CONFIGURED) return;
+  const {error} = await _supa.from('semanas').update({bloqueada}).eq('id',semanaId);
+  if(error) toast('⚠ Error: '+error.message,true);
+}
+
+// ── Borrar muestras del día ────────────────────────────────
+async function borrarMuestrasDB(semanaId, diaIndex){
+  if(!SUPABASE_CONFIGURED) return;
+  const {error} = await _supa.from('muestras').delete().match({semana_id:semanaId, dia_index:diaIndex});
+  if(error) toast('⚠ Error al borrar: '+error.message,true);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+function init(){
+  if(!S.cur) S.cur={cookie:null,week:null,day:0};
+  loadCMFromSupabase();
+  loadFromSupabase();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NAVEGACIÓN
+// ═══════════════════════════════════════════════════════════
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goHome(){
+  showPage('homePage');
+  document.getElementById('hdrBtns').innerHTML='';
+  loadFromSupabase();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HOME — Render galletas
+// ═══════════════════════════════════════════════════════════
+function renderHome(){
+  const g=document.getElementById('cookieGrid');
+  const e=Object.entries(S.cookies).sort((a,b)=>a[1].name.localeCompare(b[1].name,'es'));
+  if(!e.length){
+    g.innerHTML='<div style="color:var(--dim);font-size:13px;padding:20px">No hay galletas registradas aún.</div>';
+    return;
+  }
+  g.innerHTML=e.map(([id,c])=>{
+    const wc=Object.keys(c.weeks||{}).length;
+    const ph=c.photo?`<img src="${c.photo}">`:`<div class="cookie-photo-icon">🍪</div>`;
+    return `<div class="cookie-card" onclick="goWeekList('${id}')">
+      <span class="cookie-weeks-badge">${wc} sem</span>
+      <button class="btn btn-secondary btn-sm" style="position:absolute;top:10px;left:10px;padding:4px 8px;font-size:14px;z-index:10;border-radius:7px;line-height:1" onclick="event.stopPropagation();askEditCookie('${id}')">✏️</button>
+      <div class="cookie-photo">${ph}</div>
+      <div class="cookie-name">${c.name}</div>
+      <div class="cookie-meta">Ideal: ${c.ideal}g · Límites: ${c.limInf}–${c.limSup}g<br>Empaque: ${c.empaque}g</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PASSWORD + GALLETA NUEVA
+// ═══════════════════════════════════════════════════════════
+let pwdAction='create';
+let editCookieId=null;
+let isEditMode=false;
+let editingCookieId=null;
+
+function askPwd(){
+  pwdAction='create'; editCookieId=null;
+  document.getElementById('pwdInput').value='';
+  document.getElementById('pwdErr').style.display='none';
+  document.querySelector('#modalPwd p').textContent='Contraseña requerida para crear una nueva galleta.';
+  openM('modalPwd');
+}
+function askEditCookie(id){
+  pwdAction='edit'; editCookieId=id;
+  document.getElementById('pwdInput').value='';
+  document.getElementById('pwdErr').style.display='none';
+  document.querySelector('#modalPwd p').textContent='Contraseña requerida para editar la galleta.';
+  openM('modalPwd');
+}
+function checkPwd(){
+  const v=document.getElementById('pwdInput').value;
+  if(v!==PWD){ document.getElementById('pwdErr').style.display='block'; return; }
+  closeM('modalPwd');
+  document.querySelector('#modalPwd p').textContent='Contraseña requerida para crear una nueva galleta.';
+  if(pwdAction==='create') openNewCookieModal();
+  else if(pwdAction==='edit') openEditCookieModal(editCookieId);
+  else if(pwdAction==='editLocked') unlockForEdit();
+  else if(pwdAction==='editCM'){ openModalCMEdit(_cmEditPendingId); _cmEditPendingId=null; }
+}
+function openEditCookieModal(id){
+  isEditMode=true; editingCookieId=id;
+  const c=S.cookies[id];
+  document.getElementById('ncName').value=c.name;
+  document.getElementById('ncEmpaque').value=c.empaque;
+  document.getElementById('ncIdeal').value=c.ideal;
+  document.getElementById('ncLimInf').value=c.limInf;
+  document.getElementById('ncLimSup').value=c.limSup;
+  document.getElementById('ncPhotoUrl').value=c.photo||'';
+  const prev=document.getElementById('ncPhotoPreview');
+  const img=document.getElementById('ncPhotoImg');
+  if(c.photo){ img.src=c.photo; prev.style.display='block'; } else { prev.style.display='none'; }
+  document.querySelector('#modalNC .modal-title').textContent='✏️ Editar Galleta';
+  document.querySelector('#modalNC .btn-primary').textContent='Guardar Cambios';
+  openM('modalNC');
+}
+function openNewCookieModal(){
+  isEditMode=false; editingCookieId=null;
+  document.getElementById('ncName').value='';
+  document.getElementById('ncEmpaque').value=12;
+  document.getElementById('ncIdeal').value=500;
+  document.getElementById('ncLimInf').value=490;
+  document.getElementById('ncLimSup').value=510;
+  document.getElementById('ncPhotoUrl').value='';
+  document.getElementById('ncPhotoPreview').style.display='none';
+  document.querySelector('#modalNC .modal-title').textContent='➕ Nueva Galleta';
+  document.querySelector('#modalNC .btn-primary').textContent='Crear Galleta';
+  openM('modalNC');
+}
+function prevUrl(){
+  const url=document.getElementById('ncPhotoUrl').value.trim();
+  const prev=document.getElementById('ncPhotoPreview');
+  const img=document.getElementById('ncPhotoImg');
+  if(url){ img.src=url; prev.style.display='block'; }
+  else { prev.style.display='none'; }
+}
+async function createCookie(){
+  const name=document.getElementById('ncName').value.trim();
+  if(!name){ toast('⚠ Escribe el nombre de la galleta',true); return; }
+  const obj={
+    name,
+    empaque: parseFloat(document.getElementById('ncEmpaque').value)||0,
+    ideal: parseFloat(document.getElementById('ncIdeal').value)||0,
+    limInf: parseFloat(document.getElementById('ncLimInf').value)||0,
+    limSup: parseFloat(document.getElementById('ncLimSup').value)||0,
+    photo: document.getElementById('ncPhotoUrl').value.trim()||null,
+    weeks: {}
+  };
+  if(isEditMode && editingCookieId){
+    obj.weeks=S.cookies[editingCookieId].weeks;
+    S.cookies[editingCookieId]=obj;
+    const ok=await saveGalletaDB(editingCookieId, obj);
+    if(ok){ saveLocal(); closeM('modalNC'); renderHome(); toast(`✅ "${name}" actualizada`); }
+  } else {
+    const id='c_'+Date.now();
+    S.cookies[id]=obj;
+    const ok=await saveGalletaDB(id, obj);
+    if(ok){ saveLocal(); closeM('modalNC'); renderHome(); toast(`✅ "${name}" creada`); }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SEMANAS
+// ═══════════════════════════════════════════════════════════
+function goWeekList(cookieId){
+  S.cur.cookie=cookieId;
+  const c=S.cookies[cookieId];
+  const ph=document.getElementById('wlPhoto');
+  ph.innerHTML=c.photo?`<img src="${c.photo}">`:'🍪';
+  document.getElementById('wlCookieName').textContent=c.name;
+  document.getElementById('wlCookieMeta').textContent=`Ideal: ${c.ideal}g · Límites: ${c.limInf}–${c.limSup}g · Empaque: ${c.empaque}g`;
+  renderWeekList(); showPage('weekListPage');
+  document.getElementById('hdrBtns').innerHTML='';
+}
+function renderWeekList(){
+  const c=S.cookies[S.cur.cookie];
+  const weeks=Object.entries(c.weeks||{}).sort((a,b)=>{
+    const ya=a[1].year*100+(a[1].weekNum||0), yb=b[1].year*100+(b[1].weekNum||0);
+    return yb-ya;
+  });
+  let html=`<div class="week-row new-week-row" onclick="openNWModal()">
+    <div><div class="week-row-title">➕ Llenar nueva semana</div>
+    <div class="week-row-dates">Agregar semana de empaquetado</div></div>
+  </div>`;
+  weeks.forEach(([wid,w])=>{
+    const filled=Object.values(w.data||{}).filter(d=>d&&d.length).length;
+    let st='';
+    if(w.locked) st=`<span class="st-locked">🔒 Cerrada</span>`;
+    else if(filled===6) st=`<span class="st-ok">✓ Completa</span>`;
+    else if(filled>0) st=`<span class="st-prog">◑ ${filled}/6 días</span>`;
+    else st=`<span class="st-prog">○ Sin datos</span>`;
+    const dr=w.dateStart?`${fmtD(w.dateStart)} al ${fmtD(w.dateEnd)}`:'';
+    const lotesUnicos=[...new Set(Object.values(w.dayInfo||{}).map(di=>di.lote).filter(Boolean))];
+    const loteLine=lotesUnicos.length?`<div class="week-row-dates" style="color:var(--accent)">Lotes: ${lotesUnicos.join(', ')}</div>`:'';
+    html+=`<div class="week-row${w.locked?' locked':''}" onclick="openWork('${wid}')">
+      <div>
+        <div class="week-row-title">Semana ${w.weekNum} · ${w.year}</div>
+        <div class="week-row-dates">${dr}</div>
+        ${loteLine}
+      </div>
+      <div class="week-row-right">${st}</div>
+    </div>`;
+  });
+  document.getElementById('weekList').innerHTML=html;
+}
+
+function isoWeek(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  d.setDate(d.getDate()+3-(d.getDay()+6)%7);
+  const w1=new Date(d.getFullYear(),0,4);
+  return 1+Math.round(((d-w1)/86400000-3+(w1.getDay()+6)%7)/7);
+}
+function openNWModal(){
+  const today=new Date();
+  const mon=new Date(today);
+  mon.setDate(today.getDate()-(today.getDay()===0?6:today.getDay()-1));
+  document.getElementById('nwStart').value=mon.toISOString().split('T')[0];
+  previewWeek(); openM('modalNW');
+}
+function previewWeek(){
+  const v=document.getElementById('nwStart').value; if(!v) return;
+  const s=new Date(v+'T00:00:00');
+  const e=new Date(s); e.setDate(s.getDate()+5);
+  const wn=isoWeek(v);
+  document.getElementById('nwPreview').textContent=
+    `Semana ${wn} · ${s.toLocaleDateString('es-MX',{day:'2-digit',month:'long'})} al ${e.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})}`;
+}
+async function createWeek(){
+  const sv=document.getElementById('nwStart').value;
+  if(!sv){ toast('⚠ Selecciona fecha',true); return; }
+  const s=new Date(sv+'T00:00:00');
+  const e=new Date(s); e.setDate(s.getDate()+5);
+  const wn=isoWeek(sv), year=s.getFullYear();
+  const wid=`w_${year}_${String(wn).padStart(2,'0')}`;
+  const c=S.cookies[S.cur.cookie];
+  if(c.weeks[wid]){ toast(`⚠ Semana ${wn} ya existe`,true); closeM('modalNW'); return; }
+  const newWeek={
+    weekNum:wn, year,
+    dateStart:sv, dateEnd:e.toISOString().split('T')[0],
+    data:{0:[],1:[],2:[],3:[],4:[],5:[]},
+    dayInfo:{0:{lote:'',fechaEmpaque:'',fechaVence:''},
+             1:{lote:'',fechaEmpaque:'',fechaVence:''},
+             2:{lote:'',fechaEmpaque:'',fechaVence:''},
+             3:{lote:'',fechaEmpaque:'',fechaVence:''},
+             4:{lote:'',fechaEmpaque:'',fechaVence:''},
+             5:{lote:'',fechaEmpaque:'',fechaVence:''}},
+    locked:false
+  };
+  c.weeks[wid]=newWeek;
+  const ok=await saveSemanoDB(wid, S.cur.cookie, newWeek);
+  if(ok){ saveLocal(); closeM('modalNW'); openWork(wid); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PÁGINA DE TRABAJO
+// ═══════════════════════════════════════════════════════════
+function openWork(weekId){
+  S.cur.week=weekId; S.cur.day=0;
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[weekId];
+  const locked=w.locked;
+  if(!w.dayInfo){
+    w.dayInfo={};
+    for(let i=0;i<6;i++) w.dayInfo[i]={lote:'',fechaEmpaque:'',fechaVence:''};
+  }
+  document.getElementById('breadcrumb').innerHTML=`
+    <span class="bc-link" onclick="goHome()">Inicio</span> /
+    <span class="bc-link" onclick="goWeekList('${S.cur.cookie}')">${c.name}</span> /
+    Semana ${w.weekNum} · ${fmtD(w.dateStart)} al ${fmtD(w.dateEnd)}`;
+  document.getElementById('lockedBanner').style.display=locked?'flex':'none';
+  document.getElementById('hdrBtns').innerHTML=locked
+    ?`<span style="color:var(--red);font-size:12px;font-family:'DM Mono',monospace">🔒 Cerrada</span>
+      <button class="btn btn-secondary btn-sm print-hide" onclick="askEditLocked()">✏️ Editar semana</button>
+      <button class="btn btn-secondary btn-sm print-hide" onclick="doPrint('week')">🖨 Imprimir semana</button>
+      <button class="btn btn-secondary btn-sm print-hide" onclick="doPrint('day')">🖨 Imprimir día</button>`
+    :`<button class="btn btn-secondary btn-sm print-hide" onclick="doPrint('week')">🖨 Imprimir semana</button>
+      <button class="btn btn-secondary btn-sm print-hide" onclick="doPrint('day')">🖨 Imprimir día</button>
+      <button class="btn btn-danger btn-sm print-hide" onclick="lockWeek()">🔒 Cerrar semana</button>`;
+  document.getElementById('cookieInfo').innerHTML=`
+    <div class="stat-row"><span class="sl">Galleta</span><span class="sv">${c.name}</span></div>
+    <div class="stat-row"><span class="sl">Peso empaque</span><span class="sv">${c.empaque}g</span></div>
+    <div class="stat-row"><span class="sl">Peso ideal</span><span class="sv">${c.ideal}g</span></div>
+    <div class="stat-row"><span class="sl">Límite inferior</span><span class="sv">${c.limInf}g</span></div>
+    <div class="stat-row"><span class="sl">Límite superior</span><span class="sv">${c.limSup}g</span></div>`;
+  showPage('workPage');
+  loadDayFields(); renderDayPills(); renderWeekProgress();
+  renderChartD(); renderChartW(); updateStats(); renderDataTables();
+  const badge=document.getElementById('chartWDayBadge');
+  if(badge) badge.textContent='· '+DAYS[S.cur.day];
+}
+function loadDayFields(){
+  const w=S.cookies[S.cur.cookie].weeks[S.cur.week];
+  const di=w.dayInfo[S.cur.day]||{};
+  document.getElementById('fieldLote').value=di.lote||'';
+  document.getElementById('fieldFechaEmpaque').value=di.fechaEmpaque||'';
+  document.getElementById('fieldFechaVence').value=di.fechaVence||'';
+  const locked=w.locked;
+  ['fieldLote','fieldFechaEmpaque','fieldFechaVence','dataInput'].forEach(id=>{
+    document.getElementById(id).disabled=locked;
+  });
+  document.querySelectorAll('.sidebar .btn').forEach(b=>{ b.disabled=locked; });
+}
+async function saveLoteInfo(){
+  const w=S.cookies[S.cur.cookie].weeks[S.cur.week];
+  if(w.locked) return;
+  if(!w.dayInfo) w.dayInfo={};
+  if(!w.dayInfo[S.cur.day]) w.dayInfo[S.cur.day]={};
+  const di={
+    lote: document.getElementById('fieldLote').value,
+    fechaEmpaque: document.getElementById('fieldFechaEmpaque').value,
+    fechaVence: document.getElementById('fieldFechaVence').value
+  };
+  w.dayInfo[S.cur.day]=di;
+  saveLocal();
+  await saveLoteDB(S.cur.week, S.cur.day, di);
+  toast('✅ Lote guardado');
+}
+async function lockWeek(){
+  if(!confirm('¿Cerrar esta semana? Ya no se podrá editar.')) return;
+  S.cookies[S.cur.cookie].weeks[S.cur.week].locked=true;
+  saveLocal();
+  await updateBloqueadoDB(S.cur.week, true);
+  toast('🔒 Semana cerrada'); openWork(S.cur.week);
+}
+function askEditLocked(){
+  pwdAction='editLocked'; editCookieId=null;
+  document.getElementById('pwdInput').value='';
+  document.getElementById('pwdErr').style.display='none';
+  document.querySelector('#modalPwd p').textContent='Contraseña requerida para editar una semana cerrada.';
+  openM('modalPwd');
+}
+async function unlockForEdit(){
+  S.cookies[S.cur.cookie].weeks[S.cur.week].locked=false;
+  saveLocal();
+  await updateBloqueadoDB(S.cur.week, false);
+  toast('🔓 Semana desbloqueada'); openWork(S.cur.week);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DÍAS + DATOS
+// ═══════════════════════════════════════════════════════════
+function renderDayPills(){
+  const w=S.cookies[S.cur.cookie].weeks[S.cur.week];
+  document.getElementById('dayPills').innerHTML=DAYS.map((d,i)=>`
+    <div class="day-pill ${i===S.cur.day?'active':''} ${(w.data[i]||[]).length?'has-data':''}"
+         onclick="selectDay(${i})">${d}</div>`).join('');
+}
+function selectDay(i){
+  S.cur.day=i;
+  renderDayPills(); loadDayFields(); updateStats(); renderChartD(); renderChartW();
+  const badge=document.getElementById('chartWDayBadge');
+  if(badge) badge.textContent='· '+DAYS[i];
+}
+
+async function cargarDatos(){
+  const w=S.cookies[S.cur.cookie].weeks[S.cur.week];
+  if(w.locked){ toast('⚠ Semana cerrada',true); return; }
+  const c=S.cookies[S.cur.cookie];
+  const raw=document.getElementById('dataInput').value.trim();
+  if(!raw){ toast('⚠ Pega los datos primero',true); return; }
+  const vals=raw.split(/[\n\r,;|\t ]+/).map(v=>v.trim().replace(',','.')).filter(v=>v!==''&&!isNaN(v)).map(Number);
+  if(!vals.length){ toast('⚠ Sin números válidos',true); return; }
+  w.data[S.cur.day]=vals.map(v=>parseFloat((v-c.empaque).toFixed(4)));
+  document.getElementById('dataInput').value='';
+  saveLocal();
+  await saveMuestrasDB(S.cur.week, S.cur.cookie, S.cur.day, w.data[S.cur.day], c.empaque, c.limInf, c.limSup);
+  renderDayPills(); renderWeekProgress(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
+  toast(`✅ ${w.data[S.cur.day].length} datos guardados en Supabase`);
+}
+
+async function borrarDia(){
+  const w=S.cookies[S.cur.cookie].weeks[S.cur.week];
+  if(w.locked) return;
+  if(!confirm('¿Borrar datos de este día?')) return;
+  w.data[S.cur.day]=[];
+  saveLocal();
+  await borrarMuestrasDB(S.cur.week, S.cur.day);
+  renderDayPills(); renderWeekProgress(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
+  toast('🗑 Datos borrados');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TABLAS DE DATOS
+// ═══════════════════════════════════════════════════════════
+function renderDataTables(){
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[S.cur.week];
+  const container=document.getElementById('dataTables');
+  let html='';
+  DAYS.forEach((dayName,i)=>{
+    const netos=w.data[i]||[];
+    if(!netos.length) return;
+    const di=w.dayInfo[i]||{};
+    const brutos=netos.map(v=>parseFloat((v+c.empaque).toFixed(4)));
+    html+=`<div class="day-table-section">
+      <div class="day-table-header">
+        <span>${dayName}</span>
+        <span class="day-table-meta">${netos.length} mediciones</span>
+      </div>
+      <div class="day-table-meta">
+        Lote: ${di.lote||'—'} · 
+        Empaquetado: ${di.fechaEmpaque?fmtDL(di.fechaEmpaque):'—'} · 
+        Vencimiento: ${di.fechaVence?fmtDL(di.fechaVence):'—'}
+      </div>
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Peso Bruto (g)</th><th>Peso Neto (g)</th><th>Estado</th></tr></thead>
+        <tbody>`;
+    netos.forEach((neto,idx)=>{
+      const nc=neto<c.limInf||neto>c.limSup;
+      html+=`<tr>
+        <td>${idx+1}</td>
+        <td class="td-num">${brutos[idx].toFixed(2)}</td>
+        <td class="td-num" style="${nc?'color:var(--red);font-weight:700':''}">${neto.toFixed(2)}</td>
+        <td style="${nc?'color:var(--red)':'color:var(--accent)'}">${nc?'NC':'✓'}</td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  });
+  if(!html) html='<div style="text-align:center;color:var(--dim);padding:20px;font-size:13px">No hay datos cargados aún</div>';
+  container.innerHTML=html;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ESTADÍSTICAS
+// ═══════════════════════════════════════════════════════════
+function updateStats(){
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[S.cur.week];
+  const d=w.data[S.cur.day]||[];
+  const el=document.getElementById('statsContent');
+  if(!d.length){ el.innerHTML='<div class="hint" style="text-align:center;padding:8px">Sin datos</div>'; return; }
+  const n=d.length, avg=d.reduce((a,b)=>a+b,0)/n;
+  const std=Math.sqrt(d.map(x=>(x-avg)**2).reduce((a,b)=>a+b,0)/n);
+  const fuera=d.filter(v=>v<c.limInf||v>c.limSup).length;
+  const pct=((( n-fuera)/n)*100).toFixed(1);
+  const cp=std>0?(c.limSup-c.limInf)/(6*std):999;
+  const cpk=std>0?Math.min((c.limSup-avg)/(3*std),(avg-c.limInf)/(3*std)):999;
+  const cpCls=cp>=1.33?'ok':cp>=1?'warn':'err';
+  const cpkCls=cpk>=1.33?'ok':cpk>=1?'warn':'err';
+  const fCls=fuera===0?'ok':fuera<=3?'warn':'err';
+  const lbl=(v)=>v>=1.67?'Excelente':v>=1.33?'Adecuado':v>=1?'Aceptable':'Inadecuado';
+  el.innerHTML=`
+    <div class="stat-row"><span class="sl">N datos</span><span class="sv">${n}</span></div>
+    <div class="stat-row"><span class="sl">Promedio</span><span class="sv">${avg.toFixed(2)}g</span></div>
+    <div class="stat-row"><span class="sl">Mín/Máx</span><span class="sv">${Math.min(...d).toFixed(2)}/${Math.max(...d).toFixed(2)}</span></div>
+    <div class="stat-row"><span class="sl">Desv. Est.</span><span class="sv">${std.toFixed(3)}</span></div>
+    <div class="stat-row"><span class="sl">No conforme</span><span class="sv ${fCls}">${fuera} (${((fuera/n)*100).toFixed(1)}%)</span></div>
+    <div class="stat-row"><span class="sl">Conforme</span><span class="sv ok">${pct}%</span></div>
+    <div style="border-top:1px solid var(--border);margin:8px 0 4px;font-size:10px;font-weight:700;letter-spacing:1px;color:var(--dim);text-transform:uppercase;padding-top:7px">Capacidad del Proceso</div>
+    <div class="stat-row"><span class="sl">Cp</span><span class="sv ${cpCls}">${cp.toFixed(3)} <span style="font-weight:400;font-size:10px">${lbl(cp)}</span></span></div>
+    <div class="stat-row"><span class="sl">Cpk</span><span class="sv ${cpkCls}">${cpk.toFixed(3)} <span style="font-weight:400;font-size:10px">${lbl(cpk)}</span></span></div>
+    <button class="btn btn-secondary" style="width:100%;margin-top:9px;font-size:11px;padding:5px" onclick="showCpInfo()">❓ ¿Qué significan Cp y Cpk?</button>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PROGRESO + GRÁFICAS (sin cambios vs original)
+// ═══════════════════════════════════════════════════════════
+function renderWeekProgress(){
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[S.cur.week];
+  let filled=0;
+  document.getElementById('weekProgress').innerHTML=DS.map((d,i)=>{
+    const datos=w.data[i]||[];
+    const has=datos.length>0; if(has) filled++;
+    const avg=has?(datos.reduce((a,b)=>a+b,0)/datos.length).toFixed(1):'—';
+    const fuera=has?datos.filter(v=>v<c.limInf||v>c.limSup).length:0;
+    const noConf=fuera>0?` · NC:${fuera}`:'';
+    return `<div class="wpd ${has?'filled':''}">
+      <div class="wpd-name">${d}</div>
+      <div class="wpd-count" style="color:${has?'var(--accent)':'var(--dim)'}">${has?datos.length:'—'}</div>
+      <div class="wpd-avg">${avg}${has?' g':''}${noConf}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('progSubtitle').textContent=`${filled} de 6 días registrados`;
+}
+
+function renderChartD(){
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[S.cur.week];
+  const canvas=document.getElementById('chartDiario');
+  const empty=document.getElementById('emptyDiario');
+  const allDays=[];
+  let total=0;
+  DAYS.forEach((name,i)=>{ const d=w.data[i]||[]; if(d.length){ allDays.push({name,i,data:d}); total+=d.length; }});
+  document.getElementById('chartDayTitle').textContent=`Mediciones — ${total} muestras de ${allDays.length} día${allDays.length!==1?'s':''}`;
+  const curDay=S.cur.day;
+  const leg=document.getElementById('chartLegend1');
+  // Leyenda con indicador de día activo y patrón de línea
+  leg.innerHTML=allDays.map(({name,i})=>{
+    const st=DSTYLE[i];
+    const isActive=i===curDay;
+    const dashStr=st.bwdash.length?`border-top:2px dashed #555`:`border-top:${st.bwWidth}px solid #555`;
+    const activeBadge=isActive?` <span style="background:var(--accent);color:#fff;border-radius:4px;padding:0 4px;font-size:9px;font-weight:700">● HOY</span>`:'';
+    return `<div class="leg-item" style="${isActive?'font-weight:700;color:var(--accent)':''}">
+      <div style="width:20px;height:0;${dashStr};margin-right:4px;flex-shrink:0"></div>
+      ${name}${activeBadge}
+    </div>`;
+  }).join('')+`
+    <div class="leg-item"><div class="leg-line" style="background:var(--accent)"></div>Ideal</div>
+    <div class="leg-item"><div class="leg-dash"></div>Límites</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Fuera</div>`;
+  if(!allDays.length){
+    canvas.style.display='none'; empty.style.display='flex';
+    if(chartD){ chartD.destroy(); chartD=null; } return;
+  }
+  canvas.style.display='block'; empty.style.display='none';
+  const maxS=Math.max(...allDays.map(d=>d.data.length),60);
+  const datasets=allDays.map(({name,i,data})=>{
+    const st=DSTYLE[i];
+    const isActive=i===curDay;
+    return {
+      label:name,
+      data:data.map((v,idx)=>({x:idx+1,y:v})),
+      backgroundColor:data.map(v=>v<c.limInf||v>c.limSup?'rgba(200,16,46,0.9)':DCOL[i]+'cc'),
+      pointRadius:data.map(v=>v<c.limInf||v>c.limSup?1.5:(isActive?st.pointR+1:st.pointR)),
+      pointHoverRadius:8,
+      pointStyle:st.pointStyle,
+      pointBorderColor:data.map(v=>v<c.limInf||v>c.limSup?'#c00':DCOL[i]),
+      pointBorderWidth:data.map(v=>v<c.limInf||v>c.limSup?2:1),
+      showLine:true,
+      borderColor:DCOL[i],
+      borderWidth:isActive?st.bwWidth+1:st.bwWidth,
+      borderDash:st.bwdash,
+      tension:.2,
+      order:isActive?0:1,
+    };
+  });
+  datasets.push(
+    {label:'Ideal',type:'line',data:[{x:0,y:c.ideal},{x:maxS+1,y:c.ideal}],borderColor:'#00e5a0',borderWidth:2.5,pointRadius:0},
+    {label:'Lím sup',type:'line',data:[{x:0,y:c.limSup},{x:maxS+1,y:c.limSup}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0},
+    {label:'Lím inf',type:'line',data:[{x:0,y:c.limInf},{x:maxS+1,y:c.limInf}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0}
+  );
+  if(chartD) chartD.destroy();
+  chartD=new Chart(canvas,{
+    type:'scatter', data:{datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:350},
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#1c2030',borderColor:'#252a38',borderWidth:1,
+          callbacks:{label:ctx=>{
+            if(ctx.datasetIndex>=allDays.length) return '';
+            const v=ctx.parsed.y;
+            return [`${ctx.dataset.label} · #${ctx.parsed.x}`,`${v.toFixed(2)}g`,v<c.limInf||v>c.limSup?'⚠ FUERA':'✓ OK'];
+          }}
+        }
+      },
+      scales:{
+        x:{title:{display:true,text:'N° muestra (reinicia en 1 por día)',color:'#6b7280',font:{size:10}},
+           grid:{color:'#1c2030'},ticks:{color:'#6b7280',font:{family:'DM Mono',size:10}},min:0,max:maxS+1},
+        y:{title:{display:true,text:'Peso neto (g)',color:'#6b7280',font:{size:10}},
+           grid:{color:'#1c2030'},ticks:{color:'#6b7280',font:{family:'DM Mono',size:10}}}
+      }
+    }
+  });
+}
+
+function renderChartW(){
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[S.cur.week];
+  const canvas=document.getElementById('chartSemanal');
+  const empty=document.getElementById('emptySemanal');
+  const promedios=DAYS.map((_,i)=>{ const d=w.data[i]||[]; return d.length?parseFloat((d.reduce((a,b)=>a+b,0)/d.length).toFixed(4)):null; });
+  if(!promedios.some(v=>v!==null)){
+    canvas.style.display='none'; empty.style.display='flex';
+    if(chartW){ chartW.destroy(); chartW=null; } return;
+  }
+  canvas.style.display='block'; empty.style.display='none';
+  const activeDay2=S.cur.day;
+  if(chartW) chartW.destroy();
+  chartW=new Chart(canvas,{
+    type:'bar',
+    data:{labels:DAYS,datasets:[
+      {label:'Promedio',data:promedios,
+       backgroundColor:promedios.map((v,i)=>v===null?'transparent':v<c.limInf||v>c.limSup?'rgba(200,16,46,.8)':i===activeDay2?'rgba(244,121,32,.9)':'rgba(0,229,160,.55)'),
+       borderColor:promedios.map((v,i)=>v===null?'transparent':v<c.limInf||v>c.limSup?'#C8102E':i===activeDay2?'#F47920':'#00e5a0'),
+       borderWidth:promedios.map((_,i)=>i===activeDay2?3:1.5),
+       borderRadius:8,barThickness:42},
+      {label:'Ideal',type:'line',data:Array(6).fill(c.ideal),borderColor:'#00e5a0',borderWidth:2.5,pointRadius:0,order:0},
+      {label:'Lím sup',type:'line',data:Array(6).fill(c.limSup),borderColor:'#ffd166',borderWidth:2,borderDash:[7,4],pointRadius:0,order:0},
+      {label:'Lím inf',type:'line',data:Array(6).fill(c.limInf),borderColor:'#ffd166',borderWidth:2,borderDash:[7,4],pointRadius:0,order:0},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:500},
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#1c2030',borderColor:'#252a38',borderWidth:1,
+          callbacks:{label:ctx=>ctx.datasetIndex!==0?'':ctx.parsed.y==null?'Sin datos':[`${ctx.parsed.y.toFixed(2)}g`,ctx.parsed.y<c.limInf||ctx.parsed.y>c.limSup?'⚠ FUERA':'✓ OK']}
+        }
+      },
+      scales:{
+        x:{grid:{color:'#1c2030'},ticks:{color:'#6b7280',font:{family:'DM Mono',size:10}}},
+        y:{title:{display:true,text:'Promedio (g)',color:'#6b7280',font:{size:10}},grid:{color:'#1c2030'},ticks:{color:'#6b7280',font:{family:'DM Mono',size:10}}}
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  IMPRESIÓN (sin cambios vs original)
+// ═══════════════════════════════════════════════════════════
+function doPrint(mode='week'){
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[S.cur.week];
+  const di=w.dayInfo||{};
+  const pCol=document.getElementById('pChartsCol');
+  const c1=document.getElementById('chartCard1');
+  const c2=document.getElementById('chartCard2');
+  if(mode==='day'){
+    const dayData=w.data[S.cur.day]||[];
+    if(!dayData.length){ toast('⚠ No hay datos en este día',true); return; }
+    const dayName=DAYS[S.cur.day];
+    const dayInfo=di[S.cur.day]||{};
+    const avg=(dayData.reduce((a,b)=>a+b,0)/dayData.length).toFixed(2);
+    const nc=dayData.filter(v=>v<c.limInf||v>c.limSup).length;
+    document.getElementById('pshSub').textContent=`${c.name} · Semana ${w.weekNum}/${w.year} · ${dayName} · ${fmtDL(w.dateStart)}`;
+    document.getElementById('pTableGalleta').innerHTML=`
+      <tr><td>Galleta</td><td>${c.name}</td></tr>
+      <tr><td>Día</td><td>${dayName}</td></tr>
+      <tr><td>Semana</td><td>${w.weekNum} / ${w.year}</td></tr>
+      <tr><td>Peso ideal</td><td>${c.ideal} g</td></tr>
+      <tr><td>Límites</td><td>${c.limInf} – ${c.limSup} g</td></tr>
+      <tr><td>Empaque</td><td>${c.empaque} g</td></tr>`;
+    document.getElementById('pTableLote').innerHTML=`
+      <tr><td>Lote</td><td>${dayInfo.lote||'—'}</td></tr>
+      <tr><td>Empaquetado</td><td>${dayInfo.fechaEmpaque?fmtDL(dayInfo.fechaEmpaque):'—'}</td></tr>
+      <tr><td>Vencimiento</td><td>${dayInfo.fechaVence?fmtDL(dayInfo.fechaVence):'—'}</td></tr>
+      <tr><td>Mediciones</td><td><strong>${dayData.length}</strong></td></tr>
+      <tr><td>Promedio</td><td><strong>${avg} g</strong></td></tr>
+      <tr><td>No conforme</td><td><strong>${nc}</strong> (${((nc/dayData.length)*100).toFixed(1)}%)</td></tr>`;
+    document.getElementById('pTableStats').innerHTML='';
+    const _st=DSTYLE[S.cur.day];
+    const _ds=_st.bwdash.length?`border-top:2px dashed #000`:`border-top:${Math.round(_st.bwWidth)}px solid #000`;
+    document.getElementById('chartLegend1').innerHTML=`
+      <div class="leg-item"><span style="display:inline-block;width:18px;height:0;${_ds};margin-right:3px;vertical-align:middle"></span>${dayName}</div>
+      <div class="leg-item"><div class="leg-line" style="background:#000"></div>Ideal</div>
+      <div class="leg-item"><div class="leg-dash" style="border-color:#000"></div>Límites</div>`;
+    const n=dayData.length;
+    const rowsPerMini=20;
+    const numMinis=Math.ceil(n/rowsPerMini);
+    const numCols=Math.min(numMinis,5);
+    const rpc=Math.ceil(n/numCols);
+    const thS='padding:0.6mm 1mm;border:0.5px solid #888;background:#eee;font-weight:700;text-align:center;font-size:5.8pt;font-family:Arial';
+    const tdBase='padding:0.4mm 1mm;border:0.5px solid #ccc;font-size:5.8pt;font-family:Arial';
+    let miniTables='';
+    for(let col=0;col<numCols;col++){
+      const startIdx=col*rpc;
+      const endIdx=Math.min(startIdx+rpc,n);
+      let rows='';
+      for(let idx=startIdx;idx<endIdx;idx++){
+        const neto=dayData[idx];
+        const isNC=neto<c.limInf||neto>c.limSup;
+        const rowBg=isNC?'background:#fdd':'';
+        const ncCol=isNC?'color:#b00;font-weight:700':'color:#060';
+        rows+=`<tr style="${rowBg}">
+          <td style="${tdBase};text-align:center">${idx+1}</td>
+          <td style="${tdBase};text-align:right">${neto.toFixed(2)}</td>
+          <td style="${tdBase};text-align:center;${ncCol}">${isNC?'NC':'✓'}</td>
+        </tr>`;
+      }
+      miniTables+=`<table style="border-collapse:collapse;width:100%">
+        <thead><tr>
+          <th style="${thS}">#</th>
+          <th style="${thS}">g</th>
+          <th style="${thS}">Est</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    }
+    const dataCardHtml=`<div style="font-size:8pt;font-weight:700;font-family:Arial;margin-bottom:2mm;color:#000">Pesos Netos · ${n} muestras</div>
+      <div style="display:grid;grid-template-columns:repeat(${numCols},1fr);gap:2mm;align-items:start">${miniTables}</div>`;
+    c2.className='print-day-data-card';
+    c2.innerHTML=dataCardHtml;
+    pCol.className='print-charts-col day-mode';
+    pCol.appendChild(c1);
+    pCol.appendChild(c2);
+  } else {
+    document.getElementById('pshSub').textContent=`${c.name} · Semana ${w.weekNum}/${w.year} · ${fmtDL(w.dateStart)} al ${fmtDL(w.dateEnd)}`;
+    document.getElementById('pTableGalleta').innerHTML=`
+      <tr><td>Galleta</td><td>${c.name}</td></tr>
+      <tr><td>Semana</td><td>${w.weekNum} / ${w.year}</td></tr>
+      <tr><td>Período</td><td>${fmtDL(w.dateStart)} – ${fmtDL(w.dateEnd)}</td></tr>
+      <tr><td>Peso ideal</td><td>${c.ideal} g</td></tr>
+      <tr><td>Límites</td><td>${c.limInf} – ${c.limSup} g</td></tr>
+      <tr><td>Empaque</td><td>${c.empaque} g</td></tr>`;
+    document.getElementById('pTableLote').innerHTML='';
+    document.getElementById('pTableStats').innerHTML='';
+    const allDays=[];
+    DAYS.forEach((name,i)=>{ const d=w.data[i]||[]; if(d.length) allDays.push({name,i}); });
+    document.getElementById('chartLegend1').innerHTML=allDays.map(({name,i})=>{
+      const st=DSTYLE[i];
+      const dashStyle=st.bwdash.length?`border-top:2px dashed #000`:`border-top:${Math.round(st.bwWidth)}px solid #000`;
+      return `<div class="leg-item"><span style="display:inline-block;width:18px;height:0;${dashStyle};margin-right:3px;vertical-align:middle"></span>${name}</div>`;
+    }).join('')+`
+      <div class="leg-item"><div class="leg-line" style="background:#000"></div>Ideal</div>
+      <div class="leg-item"><div class="leg-dash" style="border-color:#000"></div>Límites</div>`;
+    let summaryRows='';
+    DAYS.forEach((dname,i)=>{
+      const d=w.data[i]||[];
+      const inf=di[i]||{};
+      if(!d.length && !inf.lote) return;
+      const avg=d.length?(d.reduce((a,b)=>a+b,0)/d.length).toFixed(2):'—';
+      const mn=d.length?Math.min(...d).toFixed(2):'—';
+      const mx=d.length?Math.max(...d).toFixed(2):'—';
+      const nc=d.length?d.filter(v=>v<c.limInf||v>c.limSup).length:0;
+      const ncPct=d.length?((nc/d.length)*100).toFixed(1):'—';
+      const avgColor=d.length&&(parseFloat(avg)<c.limInf||parseFloat(avg)>c.limSup)?'color:#c00;font-weight:700':'';
+      summaryRows+=`<tr>
+        <td style="text-align:left;font-weight:700">${dname}</td>
+        <td>${inf.lote||'—'}</td>
+        <td>${inf.fechaEmpaque?fmtD(inf.fechaEmpaque):'—'}</td>
+        <td>${inf.fechaVence?fmtD(inf.fechaVence):'—'}</td>
+        <td>${d.length||'—'}</td>
+        <td style="${avgColor}">${avg}${d.length?' g':''}</td>
+        <td>${mn}${d.length?' g':''}</td>
+        <td>${mx}${d.length?' g':''}</td>
+        <td>${d.length?nc+' ('+ncPct+'%)':'—'}</td>
+      </tr>`;
+    });
+    const weekSummaryCard=document.createElement('div');
+    weekSummaryCard.className='print-week-summary-card';
+    weekSummaryCard.innerHTML=`<div style="font-size:8pt;font-weight:700;font-family:Arial;margin-bottom:2mm;color:#000">Resumen de la semana</div>
+      <table class="print-week-summary-table">
+        <thead><tr><th>Día</th><th>Lote</th><th>Empaquetado</th><th>Vencimiento</th><th>N</th><th>Promedio</th><th>Mín</th><th>Máx</th><th>No conf.</th></tr></thead>
+        <tbody>${summaryRows||'<tr><td colspan="9">Sin datos</td></tr>'}</tbody>
+      </table>`;
+    pCol.className='print-charts-col';
+    pCol.appendChild(c1);
+    pCol.appendChild(c2);
+    pCol.appendChild(weekSummaryCard);
+  }
+  document.getElementById('printSheet').style.display='grid';
+  document.getElementById('pshHeader').style.display='block';
+  document.querySelectorAll('.print-info-table').forEach(t=>t.style.display='table');
+  document.querySelectorAll('.print-info-section').forEach(s=>s.style.display='block');
+  window.print();
+  setTimeout(()=>{
+    document.getElementById('printSheet').style.display='none';
+    document.getElementById('pshHeader').style.display='none';
+    document.querySelectorAll('.print-info-table').forEach(t=>t.style.display='none');
+    document.querySelectorAll('.print-info-section').forEach(s=>s.style.display='none');
+    const sumCard=pCol.querySelector('.print-week-summary-card');
+    if(sumCard) pCol.removeChild(sumCard);
+    c2.className='chart-card';
+    c2.innerHTML=`<div class="chart-hdr"><div>
+        <div class="chart-title">Promedios diarios</div>
+        <div class="chart-sub">Gráfica semanal de control</div>
+      </div></div>
+      <div class="legend">
+        <div class="leg-item"><div class="leg-dot" style="background:var(--accent)"></div>Dentro norma</div>
+        <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Fuera límite</div>
+        <div class="leg-item"><div class="leg-line" style="background:var(--accent)"></div>Ideal</div>
+        <div class="leg-item"><div class="leg-dash"></div>Límites</div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chartSemanal"></canvas>
+        <div class="empty-chart" id="emptySemanal" style="position:absolute;inset:0;">
+          <div style="font-size:30px">📅</div><div>Se construye día a día</div>
+        </div>
+      </div>`;
+    pCol.className='print-charts-col';
+    const cont=document.querySelector('.content');
+    const prog=cont.querySelector('.chart-card');
+    cont.insertBefore(c1,prog.nextSibling);
+    cont.appendChild(c2);
+    renderChartD(); renderChartW();
+    if(chartD) chartD.resize();
+    if(chartW) chartW.resize();
+  },800);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Cp INFO
+// ═══════════════════════════════════════════════════════════
+function showCpInfo(){
+  openInfo('📊 Cp y Cpk — Capacidad del Proceso',`
+    <div style="font-size:13px;line-height:1.8;color:var(--text)">
+      <p style="color:var(--dim);font-size:11px;margin-bottom:12px">Índices estadísticos de control de calidad</p>
+      <b style="color:var(--accent)">Cp — Capacidad Potencial</b><br>
+      <span style="font-size:12px;color:var(--dim)">¿El proceso PUEDE cumplir los límites? (ignora si está centrado)</span>
+      <div style="background:var(--surface2);padding:10px;border-radius:7px;font-size:12px;font-family:'DM Mono',monospace;margin:10px 0">
+        ✅ Cp ≥ 1.67 → Excelente · ✅ ≥ 1.33 → Adecuado<br>
+        ⚠️ Cp ≥ 1.00 → Aceptable (vigilar) · ❌ &lt; 1.00 → Inadecuado
+      </div>
+      <b style="color:var(--accent)">Cpk — Capacidad Real</b><br>
+      <span style="font-size:12px;color:var(--dim)">¿El proceso ESTÁ cumpliendo límites y está centrado?</span>
+      <div style="background:var(--surface2);padding:10px;border-radius:7px;font-size:12px;font-family:'DM Mono',monospace;margin:10px 0">
+        ✅ Cpk ≥ 1.67 → Excelente · ✅ ≥ 1.33 → Adecuado<br>
+        ⚠️ Cpk ≥ 1.00 → Aceptable (descentrado) · ❌ &lt; 1.00 → Produce defectos
+      </div>
+      <div style="background:var(--surface2);padding:10px;border-radius:7px;border-left:3px solid var(--accent);font-size:12px">
+        <b>💡 Clave:</b><br>
+        • Cp alto + Cpk bajo = capaz pero DESCENTRADO → ajustar máquina<br>
+        • Cpk ≈ Cp = perfectamente centrado en el objetivo<br>
+        • Ambos bajos = revisar materiales y equipos
+      </div>
+    </div>`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════
+function fmtD(d){ if(!d) return '—'; return new Date(d+'T00:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short'}); }
+function fmtDL(d){ if(!d) return 'N/A'; return new Date(d+'T00:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}); }
+function openM(id){ document.getElementById(id).classList.add('show'); }
+function closeM(id){ document.getElementById(id).classList.remove('show'); }
+let _infoM=null;
+function openInfo(title,content){
+  if(!_infoM){
+    _infoM=document.createElement('div');
+    _infoM.className='modal';
+    _infoM.id='_infoM';
+    _infoM.innerHTML=`<div class="modal-box" style="max-width:500px"><div class="modal-title" id="_iT"></div><div id="_iC"></div><div class="modal-actions"><button class="btn btn-primary" onclick="closeM('_infoM')">Entendido</button></div></div>`;
+    document.body.appendChild(_infoM);
+  }
+  document.getElementById('_iT').textContent=title;
+  document.getElementById('_iC').innerHTML=content;
+  openM('_infoM');
+}
+function toast(msg,isErr=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='toast show'+(isErr?' terror':'');
+  setTimeout(()=>t.className='toast',2800);
+}
+
+
+// ═══════════════════════════════════════════════════════════
+//  CONTRAMUESTRAS
+// ═══════════════════════════════════════════════════════════
+let CM = [];
+let cmFilter = 'todos';
+let _cmEditPendingId = null; // id pendiente de editar tras contraseña
+
+function loadCM(){
+  try{ const s=localStorage.getItem('qc_contramuestras'); if(s) CM=JSON.parse(s); }catch(e){ CM=[]; }
+}
+function saveCM_local(){
+  localStorage.setItem('qc_contramuestras', JSON.stringify(CM));
+}
+
+// Número automático correlativo — siempre max+1 sin importar eliminaciones
+function nextCMNum(){
+  const nums = CM.map(c=>parseInt((c.num||'').toString().replace(/\D/g,''))||0);
+  const next = nums.length ? Math.max(...nums)+1 : 1;
+  return 'CM-'+String(next).padStart(3,'0');
+}
+
+// Supabase
+async function loadCMFromSupabase(){
+  if(!SUPABASE_CONFIGURED){ loadCM(); return; }
+  try{
+    const {data,error}=await _supa.from('contramuestras').select('*').order('created_at',{ascending:true});
+    if(error){ loadCM(); return; }
+    CM=data.map(r=>({
+      id:r.id, num:r.num, producto:r.producto, lote:r.lote,
+      fProd:r.f_prod, fVenc:r.f_venc, cantidad:r.cantidad,
+      obs:r.obs||'', desechado:r.desechado||false, createdAt:r.created_at
+    }));
+    saveCM_local();
+  }catch(e){ loadCM(); }
+}
+async function saveCMToDB(cm){
+  if(!SUPABASE_CONFIGURED) return;
+  try{
+    await _supa.from('contramuestras').upsert({
+      id:cm.id, num:cm.num, producto:cm.producto, lote:cm.lote,
+      f_prod:cm.fProd||null, f_venc:cm.fVenc||null,
+      cantidad:cm.cantidad, obs:cm.obs||'', desechado:cm.desechado||false
+    });
+  }catch(e){}
+}
+async function updateDesecharDB(id, desechado){
+  if(!SUPABASE_CONFIGURED) return;
+  try{ await _supa.from('contramuestras').update({desechado}).eq('id',id); }catch(e){}
+}
+
+async function goContramuestras(){
+  showPage('cmPage');
+  document.getElementById('hdrBtns').innerHTML=`<button class="btn btn-secondary btn-sm print-hide" onclick="goHome()">← Inicio</button>`;
+  await loadCMFromSupabase();
+  renderCM();
+}
+
+// ── Abrir modal nueva contramuestra (sin contraseña) ──────
+function openModalCM(){
+  document.getElementById('cmEditId').value='';
+  document.getElementById('modalCMTitle').textContent='🧪 Nueva Contramuestra';
+  // N° auto, solo lectura
+  document.getElementById('cmNum').value=nextCMNum();
+  document.getElementById('cmNum').readOnly=true;
+  // Limpiar campos
+  ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).value='');
+  // Todos los campos habilitados para llenado libre
+  ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).disabled=false);
+  openM('modalCM');
+}
+
+// ── Editar: pide contraseña primero ───────────────────────
+function askEditCM(id){
+  _cmEditPendingId=id;
+  pwdAction='editCM';
+  document.getElementById('pwdInput').value='';
+  document.getElementById('pwdErr').style.display='none';
+  document.querySelector('#modalPwd p').textContent='Contraseña requerida para editar una contramuestra.';
+  openM('modalPwd');
+}
+function openModalCMEdit(id){
+  const r=CM.find(c=>c.id===id);
+  if(!r) return;
+  document.getElementById('cmEditId').value=id;
+  document.getElementById('modalCMTitle').textContent='✏️ Editar Contramuestra';
+  document.getElementById('cmNum').value=r.num||'';
+  document.getElementById('cmNum').readOnly=true;
+  document.getElementById('cmProducto').value=r.producto||'';
+  document.getElementById('cmLote').value=r.lote||'';
+  document.getElementById('cmFProd').value=r.fProd||'';
+  document.getElementById('cmFVenc').value=r.fVenc||'';
+  document.getElementById('cmCantidad').value=r.cantidad||'';
+  document.getElementById('cmObs').value=r.obs||'';
+  ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).disabled=false);
+  openM('modalCM');
+}
+
+async function saveCM(){
+  const producto=document.getElementById('cmProducto').value.trim();
+  if(!producto){ toast('⚠ Escribe el nombre del producto',true); return; }
+  const editId=document.getElementById('cmEditId').value;
+  const existing=editId?CM.find(c=>c.id===editId):null;
+  const obj={
+    id: editId||'cm_'+Date.now(),
+    num: document.getElementById('cmNum').value||nextCMNum(),
+    producto,
+    lote: document.getElementById('cmLote').value.trim(),
+    fProd: document.getElementById('cmFProd').value||null,
+    fVenc: document.getElementById('cmFVenc').value||null,
+    cantidad: document.getElementById('cmCantidad').value.trim(),
+    obs: document.getElementById('cmObs').value.trim(),
+    desechado: existing?.desechado||false,
+    createdAt: existing?.createdAt||new Date().toISOString()
+  };
+  if(editId){ CM=CM.map(c=>c.id===editId?obj:c); }
+  else { CM.push(obj); }
+  saveCM_local();
+  await saveCMToDB(obj);
+  closeM('modalCM');
+  renderCM();
+  toast(editId?'✅ Contramuestra actualizada':'✅ Contramuestra registrada');
+}
+
+// ── Desechar: solo disponible si está vencido ─────────────
+async function desecharCM(id){
+  const cm=CM.find(c=>c.id===id);
+  if(!cm||getCMEstado(cm)!=='vencido') return;
+  if(!confirm(`¿Confirmar que la muestra ${cm.num} fue desechada?`)) return;
+  CM=CM.map(c=>c.id===id?{...c,desechado:true}:c);
+  saveCM_local();
+  await updateDesecharDB(id,true);
+  renderCM();
+  toast('⚫ Contramuestra desechada');
+}
+
+function getCMEstado(cm){
+  if(cm.desechado) return 'desechado';
+  if(!cm.fVenc) return 'vigente';
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  return new Date(cm.fVenc+'T00:00:00')<hoy?'vencido':'vigente';
+}
+
+function setCMFilter(f,btn){
+  cmFilter=f;
+  document.querySelectorAll('.cm-filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCM();
+}
+
+function renderCM(){
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  // Alerta de vencidos sin desechar
+  const vencidos=CM.filter(c=>!c.desechado&&c.fVenc&&new Date(c.fVenc+'T00:00:00')<today);
+  const alertEl=document.getElementById('cmAlert');
+  const alertList=document.getElementById('cmAlertList');
+  if(vencidos.length){
+    alertEl.classList.remove('hidden');
+    alertList.innerHTML=vencidos.map(c=>`· <b>${c.num}</b> — ${c.producto} · Lote: ${c.lote||'—'} · Venció el ${fmtDL(c.fVenc)}`).join('<br>');
+  } else {
+    alertEl.classList.add('hidden');
+  }
+
+  // Filtrar y ordenar
+  const filtered=CM.filter(c=>cmFilter==='todos'||getCMEstado(c)===cmFilter);
+  filtered.sort((a,b)=>{
+    const order={vencido:0,vigente:1,desechado:2};
+    const ea=getCMEstado(a), eb=getCMEstado(b);
+    if(order[ea]!==order[eb]) return order[ea]-order[eb];
+    if(a.fVenc&&b.fVenc) return a.fVenc.localeCompare(b.fVenc);
+    return 0;
+  });
+
+  document.getElementById('cmCount').textContent=`${filtered.length} registro${filtered.length!==1?'s':''}`;
+  const tbody=document.getElementById('cmTbody');
+  const empty=document.getElementById('cmEmpty');
+
+  if(!filtered.length){ tbody.innerHTML=''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  const badge=(cm)=>{
+    const e=getCMEstado(cm);
+    const map={vigente:'✅ Vigente',vencido:'🔴 Vencido',desechado:'⚫ Desechado'};
+    return `<span class="cm-badge ${e}">${map[e]}</span>`;
+  };
+
+  tbody.innerHTML=filtered.map(cm=>{
+    const estado=getCMEstado(cm);
+    const rowStyle=estado==='vencido'?'background:#fff5f5':estado==='desechado'?'opacity:.65':'';
+
+    // Botón desechar: solo activo si está VENCIDO
+    let btnDesechar='';
+    if(estado==='desechado'){
+      btnDesechar=`<button class="btn-desechar done" disabled>✓ Desechado</button>`;
+    } else if(estado==='vencido'){
+      btnDesechar=`<button class="btn-desechar" style="border-color:var(--rojo);color:var(--rojo);font-weight:700" onclick="desecharCM('${cm.id}')">🗑 Desechar</button>`;
+    } else {
+      // Vigente: botón deshabilitado con tooltip explicativo
+      btnDesechar=`<button class="btn-desechar done" disabled title="Solo se puede desechar cuando la muestra está vencida" style="opacity:.35;cursor:not-allowed">🗑 Desechar</button>`;
+    }
+
+    return `<tr style="${rowStyle}">
+      <td><b style="font-family:'DM Mono',monospace">${cm.num}</b></td>
+      <td><b>${cm.producto}</b></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${cm.lote||'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${cm.fProd?fmtDL(cm.fProd):'—'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;${estado==='vencido'?'color:var(--rojo);font-weight:700':''}">${cm.fVenc?fmtDL(cm.fVenc):'—'}</td>
+      <td>${cm.cantidad||'—'}</td>
+      <td>${badge(cm)}</td>
+      <td style="max-width:180px;white-space:normal;font-size:11px;color:var(--gris-text)">${cm.obs||'—'}</td>
+      <td>
+        <div style="display:flex;gap:5px;align-items:center;flex-wrap:nowrap">
+          <button class="btn-desechar" style="border-color:var(--naranja);color:var(--naranja-osc)" title="Editar (requiere contraseña)" onclick="askEditCM('${cm.id}')">✏️</button>
+          ${btnDesechar}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+init();
+</script>
+</body>
+</html>
