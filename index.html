@@ -1195,7 +1195,7 @@ async function createWeek(){
   const s=new Date(sv+'T00:00:00');
   const e=new Date(s); e.setDate(s.getDate()+5);
   const wn=isoWeek(sv), year=s.getFullYear();
-  const wid=`w_${year}_${String(wn).padStart(2,'0')}`;
+  const wid=`w_${S.cur.cookie}_${year}_${String(wn).padStart(2,'0')}`;
   const c=S.cookies[S.cur.cookie];
   if(c.weeks[wid]){ toast(`⚠ Semana ${wn} ya existe`,true); closeM('modalNW'); return; }
   const newWeek={
