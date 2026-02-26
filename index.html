@@ -850,27 +850,12 @@ async function loadFromSupabase(){
       };
     }
 
-    // Cargar lotes por día
-    const {data:lotes, error:e3} = await _supa.from('lotes_dia').select('*');
-    if(e3) throw e3;
-    for(const l of lotes){
-      const sem=findWeek(l.semana_id);
-      if(!sem) continue;
-      sem.dayInfo[l.dia_index]={
-        lote: l.lote||'',
-        fechaEmpaque: l.fecha_empaque||'',
-        fechaVence: l.fecha_vence||''
-      };
-    }
-
-    // Cargar muestras
-    const {data:muestras, error:e4} = await _supa.from('muestras').select('*').order('dia_index').order('muestra_num');
-    if(e4) throw e4;
-    for(const m of muestras){
-      const sem=findWeek(m.semana_id);
-      if(!sem) continue;
-      if(!sem.data[m.dia_index]) sem.data[m.dia_index]=[];
-      sem.data[m.dia_index].push(parseFloat(m.peso_neto_g));
+    // ⚡ Lotes y muestras se cargan solo al abrir cada semana (ver loadWeekData)
+    // Aquí solo marcamos que los datos aún no están en memoria
+    for(const cid in S.cookies){
+      for(const wid in S.cookies[cid].weeks){
+        S.cookies[cid].weeks[wid]._loaded = false;
+      }
     }
 
     setSyncStatus('ok','Sincronizado ✓');
@@ -893,6 +878,51 @@ function findWeek(semanaId){
     if(w) return w;
   }
   return null;
+}
+
+// ⚡ Carga muestras y lotes de UNA semana específica bajo demanda
+async function loadWeekData(weekId){
+  if(!SUPABASE_CONFIGURED) return;
+  const week = findWeek(weekId);
+  if(!week || week._loaded) return; // ya cargada, no repetir
+
+  setSyncStatus('syncing','Cargando semana...');
+  try {
+    // Lotes del día
+    const {data:lotes, error:e1} = await _supa.from('lotes_dia').select('*').eq('semana_id', weekId);
+    if(e1) throw e1;
+    for(const l of lotes){
+      week.dayInfo[l.dia_index]={
+        lote: l.lote||'',
+        fechaEmpaque: l.fecha_empaque||'',
+        fechaVence: l.fecha_vence||''
+      };
+    }
+
+    // Muestras — paginación por si hay muchos datos en esa semana
+    let muestras=[], page=0, pageSize=1000, done=false;
+    while(!done){
+      const from=page*pageSize, to=from+pageSize-1;
+      const {data:batch, error:e2} = await _supa.from('muestras').select('*')
+        .eq('semana_id', weekId).order('dia_index').order('muestra_num').range(from, to);
+      if(e2) throw e2;
+      if(!batch||batch.length===0){ done=true; }
+      else { muestras=muestras.concat(batch); page++; if(batch.length<pageSize) done=true; }
+    }
+
+    // Resetear data y rellenar
+    week.data = {0:[],1:[],2:[],3:[],4:[],5:[]};
+    for(const m of muestras){
+      if(!week.data[m.dia_index]) week.data[m.dia_index]=[];
+      week.data[m.dia_index].push(parseFloat(m.peso_neto_g));
+    }
+
+    week._loaded = true;
+    setSyncStatus('ok','Sincronizado ✓');
+  } catch(err){
+    setSyncStatus('err','Error al cargar semana');
+    toast('⚠ Error cargando semana: '+(err.message||JSON.stringify(err)), true);
+  }
 }
 
 // Guardar estado en localStorage como respaldo siempre
@@ -977,9 +1007,13 @@ async function saveMuestrasDB(semanaId, galleta_id, diaIndex, netos, empaque, li
     fuera_limite: neto<limInf || neto>limSup
   }));
 
-  const {error} = await _supa.from('muestras').insert(rows);
-  if(error){ setSyncStatus('err','Error'); toast('⚠ Error guardando muestras: '+error.message,true); }
-  else setSyncStatus('ok','Guardado ✓');
+  // Insertar en lotes de 500 para no superar el límite de Supabase
+  const BATCH=500;
+  for(let i=0;i<rows.length;i+=BATCH){
+    const {error} = await _supa.from('muestras').insert(rows.slice(i,i+BATCH));
+    if(error){ setSyncStatus('err','Error'); toast('⚠ Error guardando muestras: '+error.message,true); return; }
+  }
+  setSyncStatus('ok','Guardado ✓');
 }
 
 // ── Actualizar estado bloqueado ────────────────────────────
@@ -1242,10 +1276,24 @@ async function createWeek(){
 // ═══════════════════════════════════════════════════════════
 //  PÁGINA DE TRABAJO
 // ═══════════════════════════════════════════════════════════
-function openWork(weekId){
+async function openWork(weekId){
   S.cur.week=weekId; S.cur.day=0;
   const c=S.cookies[S.cur.cookie];
   const w=c.weeks[weekId];
+
+  // ⚡ Carga datos de esta semana si aún no están en memoria
+  if(!w._loaded){
+    // Mostrar página con spinner mientras carga
+    showPage('workPage');
+    document.getElementById('breadcrumb').innerHTML=
+      `<span class="bc-link" onclick="goHome()">Inicio</span> /
+       <span class="bc-link" onclick="goWeekList('${S.cur.cookie}')">${c.name}</span> /
+       <span style="color:var(--naranja)">⏳ Cargando semana...</span>`;
+    document.getElementById('lockedBanner').style.display='none';
+    document.getElementById('hdrBtns').innerHTML='';
+    await loadWeekData(weekId);
+  }
+
   const locked=w.locked;
   if(!w.dayInfo){
     w.dayInfo={};
@@ -1349,6 +1397,7 @@ async function cargarDatos(){
   const vals=raw.split(/[\n\r,;|\t ]+/).map(v=>v.trim().replace(',','.')).filter(v=>v!==''&&!isNaN(v)).map(Number);
   if(!vals.length){ toast('⚠ Sin números válidos',true); return; }
   w.data[S.cur.day]=vals.map(v=>parseFloat((v-c.empaque).toFixed(4)));
+  w._loaded=true; // semana ya tiene datos en memoria, no recargar
   document.getElementById('dataInput').value='';
   saveLocal();
   await saveMuestrasDB(S.cur.week, S.cur.cookie, S.cur.day, w.data[S.cur.day], c.empaque, c.limInf, c.limSup);
