@@ -269,6 +269,7 @@ input[type=file]{display:none;}
   body{background:white!important;color:black!important;font-family:Arial,sans-serif;}
   header,.breadcrumb,.locked-banner,.sidebar,.print-hide,.page:not(#workPage),#workPage .week-progress-wrap{display:none!important;}
   #workPage{display:block!important;}
+  #screenContent{display:none!important;}
   main{display:block!important;max-width:100%!important;padding:0!important;margin:0!important;}
   .content{gap:4mm!important;display:block!important;}
   .print-sheet{display:grid!important;grid-template-columns:55mm 1fr!important;gap:5mm!important;width:100%!important;height:calc(205.9mm - 10mm)!important;overflow:hidden!important;align-items:start!important;}
@@ -528,11 +529,26 @@ input[type=file]{display:none;}
           </div>
           <div class="week-progress" id="weekProgress"></div>
         </div>
+        <div class="chart-card" id="chartCardDay">
+          <div class="chart-hdr">
+            <div>
+              <div class="chart-title" id="chartSingleDayTitle">Mediciones del día seleccionado</div>
+              <div class="chart-sub" id="chartSingleDaySub">Solo el día activo · Pesos netos</div>
+            </div>
+          </div>
+          <div class="legend" id="chartLegendDay"></div>
+          <div class="chart-wrap">
+            <canvas id="chartDiaSolo"></canvas>
+            <div class="empty-chart" id="emptyDiaSolo" style="position:absolute;inset:0;">
+              <div style="font-size:30px">📈</div><div>Selecciona un día con datos</div>
+            </div>
+          </div>
+        </div>
         <div class="chart-card" id="chartCard1">
           <div class="chart-hdr">
             <div>
-              <div class="chart-title" id="chartDayTitle">Mediciones de la semana</div>
-              <div class="chart-sub" id="chartDaySub" style="display:none">Pesos netos · Cada día reinicia en muestra #1</div>
+              <div class="chart-title" id="chartDayTitle">Mediciones de todos los días</div>
+              <div class="chart-sub" id="chartDaySub">Pesos netos · Todos los días de la semana</div>
             </div>
           </div>
           <div class="legend" id="chartLegend1"></div>
@@ -659,7 +675,15 @@ input[type=file]{display:none;}
       </div>
     </div>
 
-    <!-- Filtros -->
+    <!-- Buscador + Filtros -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="position:relative;flex:1;min-width:200px;max-width:320px;">
+        <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none;color:var(--gris-text)">🔍</span>
+        <input type="text" id="cmSearch" placeholder="Buscar producto, lote..."
+          style="padding-left:34px;border-radius:20px;border:2px solid var(--gris-borde);background:white;font-size:12px;height:36px;font-weight:600;color:var(--text-osc);box-shadow:0 1px 4px rgba(0,0,0,.05);width:100%"
+          oninput="renderCM()">
+      </div>
+    </div>
     <div class="cm-filters">
       <button class="cm-filter-btn active" onclick="setCMFilter('todos',this)">Todos</button>
       <button class="cm-filter-btn" onclick="setCMFilter('vigente',this)">✅ Vigentes</button>
@@ -703,19 +727,13 @@ input[type=file]{display:none;}
     <div class="modal-title" id="modalCMTitle">🧪 Nueva Contramuestra</div>
     <input type="hidden" id="cmEditId">
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;">
-      <div>
-        <label>N° Muestra <span style="font-size:9px;color:var(--gris-text)">(automático)</span></label>
-        <input type="text" id="cmNum" placeholder="CM-001" style="background:#f0f0f0;font-weight:800;color:var(--rojo)" readonly>
-      </div>
-      <div>
-        <label>Cantidad</label>
-        <input type="text" id="cmCantidad" placeholder="Ej: 200g / 3 unidades">
-      </div>
-    </div>
+    <input type="hidden" id="cmNum">
+    <label>Cantidad</label>
+    <input type="text" id="cmCantidad" placeholder="Ej: 200g / 3 unidades">
 
     <label>Producto</label>
-    <input type="text" id="cmProducto" placeholder="Ej: Galleta Chispas Chocolate">
+    <input type="text" id="cmProducto" placeholder="Ej: Galleta Chispas Chocolate" list="cmProductoList" autocomplete="off">
+    <datalist id="cmProductoList"></datalist>
 
     <label>Lote</label>
     <input type="text" id="cmLote" placeholder="Ej: L2025-031">
@@ -780,7 +798,7 @@ const PWD='lafrancesaccalidad';
 
 // Estado local en memoria (igual que antes, se sincroniza con Supabase)
 let S={cookies:{},cur:{cookie:null,week:null,day:0}};
-let chartD=null,chartW=null;
+let chartD=null,chartW=null,chartDS=null;
 
 // ── Indicador de sincronización ────────────────────────────
 function setSyncStatus(status, label){
@@ -1220,7 +1238,11 @@ function renderWeekList(){
         <div class="week-row-dates">${dr}</div>
         ${loteLine}
       </div>
-      <div class="week-row-right">${st}</div>
+      <div class="week-row-right">
+        ${st}
+        <button class="btn btn-danger btn-sm" style="padding:4px 8px;font-size:13px;line-height:1;border-radius:7px" title="Borrar semana"
+          onclick="event.stopPropagation();confirmDeleteWeek('${wid}','${w.weekNum}','${w.year}')">🗑</button>
+      </div>
     </div>`;
   });
   document.getElementById('weekList').innerHTML=html;
@@ -1320,7 +1342,7 @@ async function openWork(weekId){
     <div class="stat-row"><span class="sl">Límite superior</span><span class="sv">${c.limSup}g</span></div>`;
   showPage('workPage');
   loadDayFields(); renderDayPills(); renderWeekProgress();
-  renderChartD(); renderChartW(); updateStats(); renderDataTables();
+  renderChartSingleDay(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
   const badge=document.getElementById('chartWDayBadge');
   if(badge) badge.textContent='· '+DAYS[S.cur.day];
 }
@@ -1351,6 +1373,26 @@ async function saveLoteInfo(){
   await saveLoteDB(S.cur.week, S.cur.day, di);
   toast('✅ Lote guardado');
 }
+function confirmDeleteWeek(weekId, weekNum, year){
+  if(!confirm(`¿Borrar Semana ${weekNum}/${year} y todos sus datos?\nEsta acción no se puede deshacer.`)) return;
+  deleteWeekById(weekId);
+}
+async function deleteWeekById(weekId){
+  const cookieId=S.cur.cookie;
+  const cook=S.cookies[cookieId];
+  if(SUPABASE_CONFIGURED){
+    try{
+      await _supa.from('muestras').delete().eq('semana_id',weekId);
+      await _supa.from('lotes_dia').delete().eq('semana_id',weekId);
+      await _supa.from('semanas').delete().eq('id',weekId);
+    }catch(e){ toast('⚠ Error al borrar: '+(e.message||e),true); return; }
+  }
+  delete cook.weeks[weekId];
+  saveLocal();
+  toast('🗑 Semana borrada');
+  renderWeekList();
+}
+
 async function lockWeek(){
   if(!confirm('¿Cerrar esta semana? Ya no se podrá editar.')) return;
   S.cookies[S.cur.cookie].weeks[S.cur.week].locked=true;
@@ -1383,7 +1425,7 @@ function renderDayPills(){
 }
 function selectDay(i){
   S.cur.day=i;
-  renderDayPills(); loadDayFields(); updateStats(); renderChartD(); renderChartW();
+  renderDayPills(); loadDayFields(); updateStats(); renderChartSingleDay(); renderChartD(); renderChartW();
   const badge=document.getElementById('chartWDayBadge');
   if(badge) badge.textContent='· '+DAYS[i];
 }
@@ -1401,7 +1443,7 @@ async function cargarDatos(){
   document.getElementById('dataInput').value='';
   saveLocal();
   await saveMuestrasDB(S.cur.week, S.cur.cookie, S.cur.day, w.data[S.cur.day], c.empaque, c.limInf, c.limSup);
-  renderDayPills(); renderWeekProgress(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
+  renderDayPills(); renderWeekProgress(); renderChartSingleDay(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
   toast(`✅ ${w.data[S.cur.day].length} datos guardados en Supabase`);
 }
 
@@ -1412,7 +1454,7 @@ async function borrarDia(){
   w.data[S.cur.day]=[];
   saveLocal();
   await borrarMuestrasDB(S.cur.week, S.cur.day);
-  renderDayPills(); renderWeekProgress(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
+  renderDayPills(); renderWeekProgress(); renderChartSingleDay(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
   toast('🗑 Datos borrados');
 }
 
@@ -1511,6 +1553,112 @@ function renderWeekProgress(){
   document.getElementById('progSubtitle').textContent=`${filled} de 6 días registrados`;
 }
 
+
+// Genera SVG del símbolo de punto para la leyenda
+function pointSVG(style, col, size=10){
+  const s=size, h=s/2;
+  switch(style){
+    case 'circle':
+      return `<svg width="${s}" height="${s}" style="flex-shrink:0;margin-right:2px"><circle cx="${h}" cy="${h}" r="${h-1}" fill="${col}"/></svg>`;
+    case 'rectRot': // diamante
+      return `<svg width="${s}" height="${s}" style="flex-shrink:0;margin-right:2px"><polygon points="${h},1 ${s-1},${h} ${h},${s-1} 1,${h}" fill="${col}"/></svg>`;
+    case 'triangle':
+      return `<svg width="${s}" height="${s}" style="flex-shrink:0;margin-right:2px"><polygon points="${h},1 ${s-1},${s-1} 1,${s-1}" fill="${col}"/></svg>`;
+    case 'rect':
+      return `<svg width="${s}" height="${s}" style="flex-shrink:0;margin-right:2px"><rect x="1" y="1" width="${s-2}" height="${s-2}" fill="${col}"/></svg>`;
+    case 'cross':
+      const t=Math.round(s*0.25);
+      return `<svg width="${s}" height="${s}" style="flex-shrink:0;margin-right:2px">
+        <rect x="${h-t/2}" y="1" width="${t}" height="${s-2}" fill="${col}"/>
+        <rect x="1" y="${h-t/2}" width="${s-2}" height="${t}" fill="${col}"/>
+      </svg>`;
+    default:
+      return `<svg width="${s}" height="${s}" style="flex-shrink:0;margin-right:2px"><circle cx="${h}" cy="${h}" r="${h-1}" fill="${col}"/></svg>`;
+  }
+}
+
+// Genera el HTML de un item de leyenda con línea + símbolo
+function legItemHTML(name, col, st, isActive=false, badge=''){
+  const dash = st.bwdash.length
+    ? `border-top:${st.bwWidth}px dashed ${col}`
+    : `border-top:${st.bwWidth}px solid ${col}`;
+  const sym = pointSVG(st.pointStyle, col, 10);
+  return `<div class="leg-item" style="${isActive?`font-weight:700;color:${col}`:''}">
+    <div style="display:flex;align-items:center;margin-right:4px;flex-shrink:0">
+      <div style="width:14px;height:0;${dash}"></div>
+      ${sym}
+    </div>
+    ${name}${badge}
+  </div>`;
+}
+function renderChartSingleDay(){
+  const c=S.cookies[S.cur.cookie];
+  const w=c.weeks[S.cur.week];
+  const canvas=document.getElementById('chartDiaSolo');
+  const empty=document.getElementById('emptyDiaSolo');
+  const i=S.cur.day;
+  const data=w.data[i]||[];
+  const dayName=DAYS[i];
+  document.getElementById('chartSingleDayTitle').textContent=`Mediciones — ${dayName}`;
+  const leg=document.getElementById('chartLegendDay');
+  const st=DSTYLE[i];
+  const col=DCOL[i];
+  leg.innerHTML=legItemHTML(dayName, col, st)+`
+    <div class="leg-item"><div class="leg-line" style="background:#00e5a0"></div>Ideal</div>
+    <div class="leg-item"><div class="leg-dash"></div>Límites</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>Fuera</div>`;
+  if(!data.length){
+    canvas.style.display='none'; empty.style.display='flex';
+    if(chartDS){ chartDS.destroy(); chartDS=null; } return;
+  }
+  canvas.style.display='block'; empty.style.display='none';
+  const maxS=Math.max(data.length,30);
+  const isActive=true;
+  const ds={
+    label:dayName,
+    data:data.map((v,idx)=>({x:idx+1,y:v})),
+    backgroundColor:data.map(v=>v<c.limInf||v>c.limSup?'rgba(200,16,46,0.9)':col+'cc'),
+    pointRadius:data.map(v=>v<c.limInf||v>c.limSup?1.5:st.pointR+1),
+    pointHoverRadius:8,
+    pointStyle:st.pointStyle,
+    pointBorderColor:data.map(v=>v<c.limInf||v>c.limSup?'#c00':col),
+    pointBorderWidth:data.map(v=>v<c.limInf||v>c.limSup?2:1),
+    showLine:true,
+    borderColor:col,
+    borderWidth:st.bwWidth+1,
+    borderDash:st.bwdash,
+    tension:.2,
+  };
+  const datasets=[ds,
+    {label:'Ideal',type:'line',data:[{x:0,y:c.ideal},{x:maxS+1,y:c.ideal}],borderColor:'#00e5a0',borderWidth:2.5,pointRadius:0},
+    {label:'Lím sup',type:'line',data:[{x:0,y:c.limSup},{x:maxS+1,y:c.limSup}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0},
+    {label:'Lím inf',type:'line',data:[{x:0,y:c.limInf},{x:maxS+1,y:c.limInf}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0}
+  ];
+  if(chartDS) chartDS.destroy();
+  chartDS=new Chart(canvas,{
+    type:'scatter', data:{datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:350},
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#1c2030',borderColor:'#252a38',borderWidth:1,
+          callbacks:{label:ctx=>{
+            if(ctx.datasetIndex!==0) return '';
+            const v=ctx.parsed.y;
+            return [`${ctx.dataset.label} · #${ctx.parsed.x}`,`${v.toFixed(2)}g`,v<c.limInf||v>c.limSup?'⚠ FUERA':'✓ OK'];
+          }}
+        }
+      },
+      scales:{
+        x:{title:{display:true,text:'N° muestra',color:'#6b7280',font:{size:10}},
+           grid:{color:'#1c2030'},ticks:{color:'#6b7280',font:{family:'DM Mono',size:10}},min:0,max:maxS+1},
+        y:{title:{display:true,text:'Peso neto (g)',color:'#6b7280',font:{size:10}},
+           grid:{color:'#1c2030'},ticks:{color:'#6b7280',font:{family:'DM Mono',size:10}}}
+      }
+    }
+  });
+}
+
 function renderChartD(){
   const c=S.cookies[S.cur.cookie];
   const w=c.weeks[S.cur.week];
@@ -1525,13 +1673,10 @@ function renderChartD(){
   // Leyenda con indicador de día activo y patrón de línea
   leg.innerHTML=allDays.map(({name,i})=>{
     const st=DSTYLE[i];
+    const col=DCOL[i];
     const isActive=i===curDay;
-    const dashStr=st.bwdash.length?`border-top:2px dashed #555`:`border-top:${st.bwWidth}px solid #555`;
-    const activeBadge=isActive?` <span style="background:var(--accent);color:#fff;border-radius:4px;padding:0 4px;font-size:9px;font-weight:700">● HOY</span>`:'';
-    return `<div class="leg-item" style="${isActive?'font-weight:700;color:var(--accent)':''}">
-      <div style="width:20px;height:0;${dashStr};margin-right:4px;flex-shrink:0"></div>
-      ${name}${activeBadge}
-    </div>`;
+    const badge=isActive?` <span style="background:${col};color:#fff;border-radius:4px;padding:0 4px;font-size:9px;font-weight:700">● HOY</span>`:'';
+    return legItemHTML(name, col, st, isActive, badge);
   }).join('')+`
     <div class="leg-item"><div class="leg-line" style="background:var(--accent)"></div>Ideal</div>
     <div class="leg-item"><div class="leg-dash"></div>Límites</div>
@@ -1641,6 +1786,7 @@ function doPrint(mode='week'){
   const w=c.weeks[S.cur.week];
   const di=w.dayInfo||{};
   const pCol=document.getElementById('pChartsCol');
+  const c1day=document.getElementById('chartCardDay');
   const c1=document.getElementById('chartCard1');
   const c2=document.getElementById('chartCard2');
   if(mode==='day'){
@@ -1667,11 +1813,10 @@ function doPrint(mode='week'){
       <tr><td>No conforme</td><td><strong>${nc}</strong> (${((nc/dayData.length)*100).toFixed(1)}%)</td></tr>`;
     document.getElementById('pTableStats').innerHTML='';
     const _st=DSTYLE[S.cur.day];
-    const _ds=_st.bwdash.length?`border-top:2px dashed #000`:`border-top:${Math.round(_st.bwWidth)}px solid #000`;
-    document.getElementById('chartLegend1').innerHTML=`
-      <div class="leg-item"><span style="display:inline-block;width:18px;height:0;${_ds};margin-right:3px;vertical-align:middle"></span>${dayName}</div>
-      <div class="leg-item"><div class="leg-line" style="background:#000"></div>Ideal</div>
-      <div class="leg-item"><div class="leg-dash" style="border-color:#000"></div>Límites</div>`;
+    const _col=DCOL[S.cur.day];
+    document.getElementById('chartLegend1').innerHTML=legItemHTML(dayName,_col,_st)+`
+      <div class="leg-item"><div class="leg-line" style="background:#00e5a0"></div>Ideal</div>
+      <div class="leg-item"><div class="leg-dash" style="border-color:#ffd166"></div>Límites</div>`;
     const n=dayData.length;
     const rowsPerMini=20;
     const numMinis=Math.ceil(n/rowsPerMini);
@@ -1706,10 +1851,19 @@ function doPrint(mode='week'){
     }
     const dataCardHtml=`<div style="font-size:8pt;font-weight:700;font-family:Arial;margin-bottom:2mm;color:#000">Pesos Netos · ${n} muestras</div>
       <div style="display:grid;grid-template-columns:repeat(${numCols},1fr);gap:2mm;align-items:start">${miniTables}</div>`;
+    // Filtrar gráfica para mostrar SOLO el día seleccionado al imprimir
+    if(chartD){
+      const dayIdx=S.cur.day;
+      chartD.data.datasets.forEach((ds,i)=>{
+        const isRefLine=i>=chartD.data.datasets.length-3;
+        ds.hidden = !isRefLine && ds.label!==dayName;
+      });
+      chartD.update('none');
+    }
     c2.className='print-day-data-card';
     c2.innerHTML=dataCardHtml;
     pCol.className='print-charts-col day-mode';
-    pCol.appendChild(c1);
+    pCol.appendChild(c1day);
     pCol.appendChild(c2);
   } else {
     document.getElementById('pshSub').textContent=`${c.name} · Semana ${w.weekNum}/${w.year} · ${fmtDL(w.dateStart)} al ${fmtDL(w.dateEnd)}`;
@@ -1726,11 +1880,11 @@ function doPrint(mode='week'){
     DAYS.forEach((name,i)=>{ const d=w.data[i]||[]; if(d.length) allDays.push({name,i}); });
     document.getElementById('chartLegend1').innerHTML=allDays.map(({name,i})=>{
       const st=DSTYLE[i];
-      const dashStyle=st.bwdash.length?`border-top:2px dashed #000`:`border-top:${Math.round(st.bwWidth)}px solid #000`;
-      return `<div class="leg-item"><span style="display:inline-block;width:18px;height:0;${dashStyle};margin-right:3px;vertical-align:middle"></span>${name}</div>`;
+      const col=DCOL[i];
+      return legItemHTML(name, col, st);
     }).join('')+`
-      <div class="leg-item"><div class="leg-line" style="background:#000"></div>Ideal</div>
-      <div class="leg-item"><div class="leg-dash" style="border-color:#000"></div>Límites</div>`;
+      <div class="leg-item"><div class="leg-line" style="background:#00e5a0"></div>Ideal</div>
+      <div class="leg-item"><div class="leg-dash" style="border-color:#ffd166"></div>Límites</div>`;
     let summaryRows='';
     DAYS.forEach((dname,i)=>{
       const d=w.data[i]||[];
@@ -1798,10 +1952,11 @@ function doPrint(mode='week'){
     pCol.className='print-charts-col';
     const cont=document.querySelector('.content');
     const prog=cont.querySelector('.chart-card');
-    cont.insertBefore(c1,prog.nextSibling);
+    cont.insertBefore(c1day,prog.nextSibling);
+    cont.insertBefore(c1,c1day.nextSibling);
     cont.appendChild(c2);
-    renderChartD(); renderChartW();
-    if(chartD) chartD.resize();
+    renderChartSingleDay(); renderChartD(); renderChartW();
+    if(chartD){ chartD.data.datasets.forEach(ds=>{ ds.hidden=false; }); chartD.update('none'); chartD.resize(); }
     if(chartW) chartW.resize();
   },800);
 }
@@ -1923,13 +2078,18 @@ async function goContramuestras(){
 function openModalCM(){
   document.getElementById('cmEditId').value='';
   document.getElementById('modalCMTitle').textContent='🧪 Nueva Contramuestra';
-  // N° auto, solo lectura
-  document.getElementById('cmNum').value=nextCMNum();
-  document.getElementById('cmNum').readOnly=true;
+  // N° se asigna al guardar
+  document.getElementById('cmNum').value='';
   // Limpiar campos
   ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).value='');
   // Todos los campos habilitados para llenado libre
   ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).disabled=false);
+  // Poblar datalist con nombres de galletas en orden alfabético
+  const dl=document.getElementById('cmProductoList');
+  if(dl){
+    const nombres=Object.values(S.cookies).map(c=>c.name).sort((a,b)=>a.localeCompare(b,'es'));
+    dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join('');
+  }
   openM('modalCM');
 }
 
@@ -1966,7 +2126,7 @@ async function saveCM(){
   const existing=editId?CM.find(c=>c.id===editId):null;
   const obj={
     id: editId||'cm_'+Date.now(),
-    num: document.getElementById('cmNum').value||nextCMNum(),
+    num: editId ? (document.getElementById('cmNum').value||nextCMNum()) : 'CM-'+String(CM.length+1).padStart(3,'0'),
     producto,
     lote: document.getElementById('cmLote').value.trim(),
     fProd: document.getElementById('cmFProd').value||null,
@@ -2026,13 +2186,19 @@ function renderCM(){
   }
 
   // Filtrar y ordenar
-  const filtered=CM.filter(c=>cmFilter==='todos'||getCMEstado(c)===cmFilter);
+  const searchQ=(document.getElementById('cmSearch')?document.getElementById('cmSearch').value.trim().toLowerCase():'');
+  let filtered=CM.filter(c=>cmFilter==='todos'||getCMEstado(c)===cmFilter);
+  if(searchQ) filtered=filtered.filter(c=>
+    (c.producto||'').toLowerCase().includes(searchQ)||
+    (c.lote||'').toLowerCase().includes(searchQ)||
+    (c.num||'').toLowerCase().includes(searchQ)
+  );
+  // Orden: primero por estado (vencido > vigente > desechado), luego alfabético por producto
   filtered.sort((a,b)=>{
     const order={vencido:0,vigente:1,desechado:2};
     const ea=getCMEstado(a), eb=getCMEstado(b);
     if(order[ea]!==order[eb]) return order[ea]-order[eb];
-    if(a.fVenc&&b.fVenc) return a.fVenc.localeCompare(b.fVenc);
-    return 0;
+    return (a.producto||'').localeCompare(b.producto||'','es');
   });
 
   document.getElementById('cmCount').textContent=`${filtered.length} registro${filtered.length!==1?'s':''}`;
@@ -2048,7 +2214,7 @@ function renderCM(){
     return `<span class="cm-badge ${e}">${map[e]}</span>`;
   };
 
-  tbody.innerHTML=filtered.map(cm=>{
+  tbody.innerHTML=filtered.map((cm,rowIdx)=>{
     const estado=getCMEstado(cm);
     const rowStyle=estado==='vencido'?'background:#fff5f5':estado==='desechado'?'opacity:.65':'';
 
@@ -2064,7 +2230,7 @@ function renderCM(){
     }
 
     return `<tr style="${rowStyle}">
-      <td><b style="font-family:'DM Mono',monospace">${cm.num}</b></td>
+      <td><b style="font-family:'DM Mono',monospace">${rowIdx+1}</b></td>
       <td><b>${cm.producto}</b></td>
       <td style="font-family:'DM Mono',monospace;font-size:11px">${cm.lote||'—'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px">${cm.fProd?fmtDL(cm.fProd):'—'}</td>
