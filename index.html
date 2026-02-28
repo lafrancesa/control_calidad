@@ -172,7 +172,7 @@ header{
 .bc-link:hover{text-decoration:underline;color:var(--naranja-osc);}
 .locked-banner{background:rgba(200,16,46,.07);border-bottom:1px solid rgba(200,16,46,.2);padding:9px 26px;font-size:12px;color:var(--rojo);display:flex;align-items:center;gap:7px;font-weight:700;}
 
-main{max-width:1360px;margin:0 auto;padding:22px;display:grid;grid-template-columns:278px 1fr;gap:20px;position:relative;z-index:1;}
+main{max-width:1360px;margin:0 auto;padding:22px;display:grid;grid-template-columns:316px 1fr;gap:20px;position:relative;z-index:1;}
 .sidebar{display:flex;flex-direction:column;gap:13px;}
 .card{background:white;border:1.5px solid var(--gris-borde);border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(200,16,46,.05);}
 .card-title{font-size:10px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:var(--rojo);margin-bottom:12px;border-bottom:2px solid var(--naranja);padding-bottom:6px;}
@@ -256,6 +256,17 @@ textarea.data-input{height:100px;resize:vertical;font-size:12px;line-height:1.6;
 .pu-icon{font-size:28px;margin-bottom:5px;}
 .pu-text{font-size:12px;color:var(--gris-text);text-align:center;font-weight:600;}
 input[type=file]{display:none;}
+
+/* ── GRID INPUT ── */
+.grid-input-wrap{margin-top:8px;border:1.5px solid var(--gris-borde);border-radius:8px;overflow:auto;background:var(--gris-f);display:none;}
+.grid-input-wrap.visible{display:block;}
+.grid-input-table{border-collapse:collapse;font-size:11px;width:100%;}
+.grid-input-table th{background:var(--rojo);color:white;padding:2px 3px;font-size:7px;font-weight:800;text-align:center;letter-spacing:.5px;border:1px solid var(--rojo-osc);}
+.grid-input-table td{padding:0;border:1px solid var(--gris-borde);}
+.grid-input-table td input{width:100%;border:none;background:white;padding:2px 3px;font-size:8px;font-family:'DM Mono',monospace;font-weight:700;color:var(--text-osc);text-align:right;outline:none;min-width:32px;}
+.grid-input-table td input:focus{background:#FFF4EC;color:var(--naranja-osc);}
+.grid-toggle-btn{cursor:pointer;background:none;border:none;padding:2px 5px;font-size:16px;line-height:1;vertical-align:middle;opacity:.75;transition:.15s;}
+.grid-toggle-btn:hover{opacity:1;transform:scale(1.15);}
 
 /* ── TOAST ── */
 .toast{position:fixed;bottom:20px;right:20px;background:white;border:2px solid var(--naranja);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--naranja-osc);font-family:'DM Mono',monospace;font-weight:700;z-index:999;transform:translateY(60px);opacity:0;transition:all .26s;box-shadow:0 6px 20px rgba(244,121,32,.2);}
@@ -507,9 +518,12 @@ input[type=file]{display:none;}
           <button class="btn btn-primary btn-sm" style="width:100%;margin-top:9px" onclick="saveLoteInfo()">Guardar</button>
         </div>
         <div class="card">
-          <div class="card-title">📥 Ingresar datos</div>
+          <div class="card-title">📥 Ingresar datos <button class="grid-toggle-btn" onclick="toggleGridInput()" title="Abrir tabla de ingreso">🗃️</button></div>
           <textarea class="data-input" id="dataInput" placeholder="Pega los pesos aquí...&#10;(columna de Excel, comas, espacios...)"></textarea>
           <div class="hint">⚡ Cualquier cantidad · Se resta empaque automático</div>
+          <div class="grid-input-wrap" id="gridInputWrap">
+            <table class="grid-input-table" id="gridInputTable"></table>
+          </div>
           <button class="btn btn-primary" style="width:100%;margin-top:9px" onclick="cargarDatos()">➕ Cargar datos</button>
           <button class="btn btn-danger btn-sm" style="width:100%;margin-top:5px" onclick="borrarDia()">🗑 Borrar día</button>
         </div>
@@ -1428,6 +1442,15 @@ function selectDay(i){
   renderDayPills(); loadDayFields(); updateStats(); renderChartSingleDay(); renderChartD(); renderChartW();
   const badge=document.getElementById('chartWDayBadge');
   if(badge) badge.textContent='· '+DAYS[i];
+  // Refrescar grilla si está abierta
+  const _gw=document.getElementById('gridInputWrap');
+  if(_gw&&_gw.classList.contains('visible')){
+    const c=S.cookies[S.cur.cookie];
+    const w=c.weeks[S.cur.week];
+    const netos=w.data[i]||[];
+    document.getElementById('dataInput').value=netos.map(v=>parseFloat((v+c.empaque).toFixed(4))).join('\n');
+    syncTextareaToGrid();
+  }
 }
 
 async function cargarDatos(){
@@ -1444,6 +1467,9 @@ async function cargarDatos(){
   saveLocal();
   await saveMuestrasDB(S.cur.week, S.cur.cookie, S.cur.day, w.data[S.cur.day], c.empaque, c.limInf, c.limSup);
   renderDayPills(); renderWeekProgress(); renderChartSingleDay(); renderChartD(); renderChartW(); updateStats(); renderDataTables();
+  // Refrescar grilla si está visible
+  const _gw=document.getElementById('gridInputWrap');
+  if(_gw&&_gw.classList.contains('visible')){ syncTextareaToGrid(); }
   toast(`✅ ${w.data[S.cur.day].length} datos guardados en Supabase`);
 }
 
@@ -1810,6 +1836,8 @@ function doPrint(mode='week'){
       <tr><td>Vencimiento</td><td>${dayInfo.fechaVence?fmtDL(dayInfo.fechaVence):'—'}</td></tr>
       <tr><td>Mediciones</td><td><strong>${dayData.length}</strong></td></tr>
       <tr><td>Promedio</td><td><strong>${avg} g</strong></td></tr>
+      <tr><td>Mínimo</td><td><strong>${Math.min(...dayData).toFixed(2)} g</strong></td></tr>
+      <tr><td>Máximo</td><td><strong>${Math.max(...dayData).toFixed(2)} g</strong></td></tr>
       <tr><td>No conforme</td><td><strong>${nc}</strong> (${((nc/dayData.length)*100).toFixed(1)}%)</td></tr>`;
     document.getElementById('pTableStats').innerHTML='';
     const _st=DSTYLE[S.cur.day];
@@ -2246,6 +2274,84 @@ function renderCM(){
       </td>
     </tr>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GRID INPUT — tabla de celdas para ingreso de datos
+// ═══════════════════════════════════════════════════════════
+const GRID_COLS = 6;
+const GRID_ROWS = 10;
+
+function buildGridTable(){
+  const table = document.getElementById('gridInputTable');
+  if(!table) return;
+  // Encabezado
+  let html = '<thead><tr>';
+  for(let c=0;c<GRID_COLS;c++) html += `<th>Col ${c+1}</th>`;
+  html += '</tr></thead><tbody>';
+  for(let r=0;r<GRID_ROWS;r++){
+    html += '<tr>';
+    for(let c=0;c<GRID_COLS;c++){
+      const idx = r * GRID_COLS + c;
+      html += `<td><input type="number" step="any" id="gc_${idx}" placeholder="—"
+        oninput="syncGridToTextarea()"
+        onkeydown="gridNavKey(event,${r},${c})"></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function toggleGridInput(){
+  const wrap = document.getElementById('gridInputWrap');
+  if(!wrap.classList.contains('visible')){
+    // Si aún no se ha construido, construir
+    if(!document.getElementById('gc_0')){
+      buildGridTable();
+    }
+    // Cargar datos existentes del textarea hacia la grilla
+    syncTextareaToGrid();
+    wrap.classList.add('visible');
+  } else {
+    wrap.classList.remove('visible');
+  }
+}
+
+function syncGridToTextarea(){
+  const vals = [];
+  for(let i=0; i<GRID_ROWS*GRID_COLS; i++){
+    const el = document.getElementById('gc_'+i);
+    if(el && el.value.trim() !== '') vals.push(el.value.trim());
+  }
+  document.getElementById('dataInput').value = vals.join('\n');
+}
+
+function syncTextareaToGrid(){
+  const raw = document.getElementById('dataInput').value.trim();
+  const vals = raw ? raw.split(/[\n\r,;|\t ]+/).map(v=>v.trim()).filter(v=>v!==''&&!isNaN(v)) : [];
+  // Limpiar grilla y rellenar
+  for(let i=0; i<GRID_ROWS*GRID_COLS; i++){
+    const el = document.getElementById('gc_'+i);
+    if(el) el.value = vals[i] !== undefined ? vals[i] : '';
+  }
+}
+
+function gridNavKey(e, row, col){
+  // Navegación con Enter/Tab/Flechas entre celdas
+  let nr = row, nc = col;
+  if(e.key === 'Enter' || e.key === 'ArrowDown'){ nr++; }
+  else if(e.key === 'ArrowUp'){ nr--; }
+  else if(e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length){ nc++; }
+  else if(e.key === 'ArrowLeft' && e.target.selectionStart === 0){ nc--; }
+  else return;
+  // Wrapping columnas
+  if(nc < 0){ nc = GRID_COLS-1; nr--; }
+  if(nc >= GRID_COLS){ nc = 0; nr++; }
+  // Expandir filas si es necesario
+  if(nr >= GRID_ROWS || nr < 0) return;
+  const target = document.getElementById(`gc_${nr*GRID_COLS+nc}`);
+  if(target){ e.preventDefault(); target.focus(); target.select(); }
 }
 
 init();
