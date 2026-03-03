@@ -167,7 +167,7 @@ header{
 .new-week-row .week-row-title{color:var(--naranja-osc);}
 
 /* ── WORK PAGE ── */
-.breadcrumb{padding:10px 26px;background:white;border-bottom:1px solid var(--gris-borde);font-size:11px;font-family:'DM Mono',monospace;color:var(--gris-text);display:flex;align-items:center;gap:5px;flex-wrap:wrap;position:relative;z-index:1;}
+.breadcrumb{padding:10px 26px;background:white;border-bottom:1px solid var(--gris-borde);font-size:11px;font-family:'DM Mono',monospace;color:var(--gris-text);display:flex;align-items:center;gap:5px;flex-wrap:wrap;position:sticky;top:66px;z-index:199;box-shadow:0 2px 6px rgba(0,0,0,.07);}
 .bc-link{color:var(--rojo);cursor:pointer;font-weight:700;}
 .bc-link:hover{text-decoration:underline;color:var(--naranja-osc);}
 .locked-banner{background:rgba(200,16,46,.07);border-bottom:1px solid rgba(200,16,46,.2);padding:9px 26px;font-size:12px;color:var(--rojo);display:flex;align-items:center;gap:7px;font-weight:700;}
@@ -415,7 +415,7 @@ input[type=file]{display:none;}
     <div class="logo-icon"><img src="https://ik.imagekit.io/am3aa3uiq/la-francesa-ltda-logo_18190_220516102235.jpg" alt="La Francesa Logo" onerror="this.style.display='none';this.parentNode.innerHTML='⚖️'"></div>
     <div>
       <h1>Control de Calidad — La Francesa</h1>
-      <p>Sistema de Pesos · Norma QC</p>
+      <p>Sistema de Pesos · NB 21003</p>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:14px">
@@ -516,6 +516,11 @@ input[type=file]{display:none;}
           <label>Fecha de vencimiento</label>
           <input type="date" id="fieldFechaVence">
           <button class="btn btn-primary btn-sm" style="width:100%;margin-top:9px" onclick="saveLoteInfo()">Guardar</button>
+        </div>
+        <div class="card">
+          <div class="card-title">📝 Observaciones del día</div>
+          <textarea id="fieldObservaciones" class="data-input" style="height:80px;resize:vertical" placeholder="Ej: Se ajustó la tolva a las 10am, cambio de operario..."></textarea>
+          <button class="btn btn-primary btn-sm" style="width:100%;margin-top:9px" onclick="saveObservaciones()">Guardar observación</button>
         </div>
         <div class="card">
           <div class="card-title">📥 Ingresar datos <button class="grid-toggle-btn" onclick="toggleGridInput()" title="Abrir tabla de ingreso">🗃️</button></div>
@@ -721,6 +726,7 @@ input[type=file]{display:none;}
               <th>Estado</th>
               <th>Observaciones</th>
               <th>Acción</th>
+              <th>Causa</th>
             </tr>
           </thead>
           <tbody id="cmTbody"></tbody>
@@ -872,12 +878,12 @@ async function loadFromSupabase(){
         locked: sem.bloqueada,
         data: {0:[],1:[],2:[],3:[],4:[],5:[]},
         dayInfo: {
-          0:{lote:'',fechaEmpaque:'',fechaVence:''},
-          1:{lote:'',fechaEmpaque:'',fechaVence:''},
-          2:{lote:'',fechaEmpaque:'',fechaVence:''},
-          3:{lote:'',fechaEmpaque:'',fechaVence:''},
-          4:{lote:'',fechaEmpaque:'',fechaVence:''},
-          5:{lote:'',fechaEmpaque:'',fechaVence:''}
+          0:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+          1:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+          2:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+          3:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+          4:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+          5:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''}
         }
       };
     }
@@ -927,7 +933,8 @@ async function loadWeekData(weekId){
       week.dayInfo[l.dia_index]={
         lote: l.lote||'',
         fechaEmpaque: l.fecha_empaque||'',
-        fechaVence: l.fecha_vence||''
+        fechaVence: l.fecha_vence||'',
+        obs: l.obs||''
       };
     }
 
@@ -1015,7 +1022,8 @@ async function saveLoteDB(semanaId, diaIndex, di){
     dia_index: diaIndex,
     lote: di.lote||null,
     fecha_empaque: di.fechaEmpaque||null,
-    fecha_vence: di.fechaVence||null
+    fecha_vence: di.fechaVence||null,
+    obs: di.obs||null
   },{onConflict:'semana_id,dia_index'});
   if(error) toast('⚠ Error guardando lote: '+error.message,true);
 }
@@ -1296,12 +1304,12 @@ async function createWeek(){
     weekNum:wn, year,
     dateStart:sv, dateEnd:e.toISOString().split('T')[0],
     data:{0:[],1:[],2:[],3:[],4:[],5:[]},
-    dayInfo:{0:{lote:'',fechaEmpaque:'',fechaVence:''},
-             1:{lote:'',fechaEmpaque:'',fechaVence:''},
-             2:{lote:'',fechaEmpaque:'',fechaVence:''},
-             3:{lote:'',fechaEmpaque:'',fechaVence:''},
-             4:{lote:'',fechaEmpaque:'',fechaVence:''},
-             5:{lote:'',fechaEmpaque:'',fechaVence:''}},
+    dayInfo:{0:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+             1:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+             2:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+             3:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+             4:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''},
+             5:{lote:'',fechaEmpaque:'',fechaVence:'',obs:''}},
     locked:false
   };
   c.weeks[wid]=newWeek;
@@ -1366,8 +1374,9 @@ function loadDayFields(){
   document.getElementById('fieldLote').value=di.lote||'';
   document.getElementById('fieldFechaEmpaque').value=di.fechaEmpaque||'';
   document.getElementById('fieldFechaVence').value=di.fechaVence||'';
+  document.getElementById('fieldObservaciones').value=di.obs||'';
   const locked=w.locked;
-  ['fieldLote','fieldFechaEmpaque','fieldFechaVence','dataInput'].forEach(id=>{
+  ['fieldLote','fieldFechaEmpaque','fieldFechaVence','fieldObservaciones','dataInput'].forEach(id=>{
     document.getElementById(id).disabled=locked;
   });
   document.querySelectorAll('.sidebar .btn').forEach(b=>{ b.disabled=locked; });
@@ -1380,12 +1389,25 @@ async function saveLoteInfo(){
   const di={
     lote: document.getElementById('fieldLote').value,
     fechaEmpaque: document.getElementById('fieldFechaEmpaque').value,
-    fechaVence: document.getElementById('fieldFechaVence').value
+    fechaVence: document.getElementById('fieldFechaVence').value,
+    obs: document.getElementById('fieldObservaciones').value.trim()
   };
   w.dayInfo[S.cur.day]=di;
   saveLocal();
   await saveLoteDB(S.cur.week, S.cur.day, di);
   toast('✅ Lote guardado');
+}
+
+async function saveObservaciones(){
+  const w=S.cookies[S.cur.cookie].weeks[S.cur.week];
+  if(w.locked){ toast('⚠ Semana cerrada',true); return; }
+  if(!w.dayInfo) w.dayInfo={};
+  if(!w.dayInfo[S.cur.day]) w.dayInfo[S.cur.day]={};
+  w.dayInfo[S.cur.day].obs = document.getElementById('fieldObservaciones').value.trim();
+  saveLocal();
+  // Also save to DB via saveLoteDB which handles the whole dayInfo object
+  await saveLoteDB(S.cur.week, S.cur.day, w.dayInfo[S.cur.day]);
+  toast('✅ Observación guardada');
 }
 function confirmDeleteWeek(weekId, weekNum, year){
   if(!confirm(`¿Borrar Semana ${weekNum}/${year} y todos sus datos?\nEsta acción no se puede deshacer.`)) return;
@@ -1838,7 +1860,8 @@ function doPrint(mode='week'){
       <tr><td>Promedio</td><td><strong>${avg} g</strong></td></tr>
       <tr><td>Mínimo</td><td><strong>${Math.min(...dayData).toFixed(2)} g</strong></td></tr>
       <tr><td>Máximo</td><td><strong>${Math.max(...dayData).toFixed(2)} g</strong></td></tr>
-      <tr><td>No conforme</td><td><strong>${nc}</strong> (${((nc/dayData.length)*100).toFixed(1)}%)</td></tr>`;
+      <tr><td>No conforme</td><td><strong>${nc}</strong> (${((nc/dayData.length)*100).toFixed(1)}%)</td></tr>
+      ${dayInfo.obs?`<tr><td>Observaciones</td><td style="font-style:italic;white-space:normal">${dayInfo.obs}</td></tr>`:''}`;
     document.getElementById('pTableStats').innerHTML='';
     const _st=DSTYLE[S.cur.day];
     const _col=DCOL[S.cur.day];
@@ -2075,7 +2098,7 @@ async function loadCMFromSupabase(){
     CM=data.map(r=>({
       id:r.id, num:r.num, producto:r.producto, lote:r.lote,
       fProd:r.f_prod, fVenc:r.f_venc, cantidad:r.cantidad,
-      obs:r.obs||'', desechado:r.desechado||false, createdAt:r.created_at
+      obs:r.obs||'', desechado:r.desechado||false, causa:r.causa||'', createdAt:r.created_at
     }));
     saveCM_local();
   }catch(e){ loadCM(); }
@@ -2086,13 +2109,13 @@ async function saveCMToDB(cm){
     await _supa.from('contramuestras').upsert({
       id:cm.id, num:cm.num, producto:cm.producto, lote:cm.lote,
       f_prod:cm.fProd||null, f_venc:cm.fVenc||null,
-      cantidad:cm.cantidad, obs:cm.obs||'', desechado:cm.desechado||false
+      cantidad:cm.cantidad, obs:cm.obs||'', desechado:cm.desechado||false, causa:cm.causa||null
     });
   }catch(e){}
 }
-async function updateDesecharDB(id, desechado){
+async function updateDesecharDB(id, desechado, causa=''){
   if(!SUPABASE_CONFIGURED) return;
-  try{ await _supa.from('contramuestras').update({desechado}).eq('id',id); }catch(e){}
+  try{ await _supa.from('contramuestras').update({desechado, causa:causa||null}).eq('id',id); }catch(e){}
 }
 
 async function goContramuestras(){
@@ -2162,6 +2185,7 @@ async function saveCM(){
     cantidad: document.getElementById('cmCantidad').value.trim(),
     obs: document.getElementById('cmObs').value.trim(),
     desechado: existing?.desechado||false,
+    causa: existing?.causa||'',
     createdAt: existing?.createdAt||new Date().toISOString()
   };
   if(editId){ CM=CM.map(c=>c.id===editId?obj:c); }
@@ -2178,11 +2202,23 @@ async function desecharCM(id){
   const cm=CM.find(c=>c.id===id);
   if(!cm||getCMEstado(cm)!=='vencido') return;
   if(!confirm(`¿Confirmar que la muestra ${cm.num} fue desechada?`)) return;
-  CM=CM.map(c=>c.id===id?{...c,desechado:true}:c);
+  // Obtener la causa si ya fue ingresada en el campo
+  const causaEl=document.getElementById('causa_'+id);
+  const causa=causaEl?causaEl.value.trim():(cm.causa||'');
+  CM=CM.map(c=>c.id===id?{...c,desechado:true,causa}:c);
   saveCM_local();
-  await updateDesecharDB(id,true);
+  await updateDesecharDB(id,true,causa);
   renderCM();
   toast('⚫ Contramuestra desechada');
+}
+
+async function setCausaCM(id, valor){
+  CM=CM.map(c=>c.id===id?{...c,causa:valor}:c);
+  saveCM_local();
+  // Save causa to DB
+  if(SUPABASE_CONFIGURED){
+    try{ await _supa.from('contramuestras').update({causa:valor}).eq('id',id); }catch(e){}
+  }
 }
 
 function getCMEstado(cm){
@@ -2271,6 +2307,16 @@ function renderCM(){
           <button class="btn-desechar" style="border-color:var(--naranja);color:var(--naranja-osc)" title="Editar (requiere contraseña)" onclick="askEditCM('${cm.id}')">✏️</button>
           ${btnDesechar}
         </div>
+      </td>
+      <td style="min-width:120px;max-width:180px;white-space:normal">
+        ${estado==='desechado'
+          ? `<span style="font-size:11px;color:var(--gris-text)">${cm.causa||'—'}</span>`
+          : estado==='vencido'
+            ? `<input type="text" id="causa_${cm.id}" value="${cm.causa||''}" placeholder="Motivo de desecho..."
+                style="font-size:11px;padding:4px 6px;border:1.5px solid var(--gris-borde);border-radius:6px;width:100%;background:white;font-family:'Nunito',sans-serif;"
+                onchange="setCausaCM('${cm.id}', this.value)">`
+            : '<span style="font-size:11px;color:#ccc">—</span>'
+        }
       </td>
     </tr>`;
   }).join('');
