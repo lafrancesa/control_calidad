@@ -2659,18 +2659,112 @@ function loadSimsaLocal(){
   try{ const s=localStorage.getItem('qc_simsa'); if(s) SIMSA=JSON.parse(s); }catch(e){}
 }
 
+// ── Cargar SIMSA desde Supabase ───────────────────────────
+async function loadSimsaFromSupabase(){
+  if(!SUPABASE_CONFIGURED){ loadSimsaLocal(); return; }
+  setSyncStatus('syncing','Cargando SIMSA...');
+  try{
+    const {data:semanas, error:e1} = await _supa.from('simsa_semanas').select('*');
+    if(e1) throw e1;
+    const {data:sabores, error:e2} = await _supa.from('simsa_sabores').select('*');
+    if(e2) throw e2;
+    const {data:muestras, error:e3} = await _supa.from('simsa_muestras').select('*');
+    if(e3) throw e3;
+
+    SIMSA.weeks={};
+    for(const s of semanas){
+      SIMSA.weeks[s.id]={
+        weekNum: s.semana_num, year: s.anio,
+        dateStart: s.fecha_ini, dateEnd: s.fecha_fin,
+        empaqueSachet: parseFloat(s.empaque_sachet_g)||0,
+        empaquePaquete: parseFloat(s.empaque_paquete_g)||0,
+        flavors:{}
+      };
+    }
+    // Cargar sabores
+    for(const sb of sabores){
+      if(!SIMSA.weeks[sb.semana_id]) continue;
+      SIMSA.weeks[sb.semana_id].flavors[sb.sabor_id]={
+        sachet:[], paquete:[],
+        fechaElab: sb.fecha_elab||'', fechaVenc: sb.fecha_venc||'', op: sb.lote||''
+      };
+    }
+    // Cargar muestras
+    for(const m of muestras){
+      const w=SIMSA.weeks[m.semana_id];
+      if(!w||!w.flavors[m.sabor_id]) continue;
+      w.flavors[m.sabor_id][m.tipo].push(parseFloat(m.peso_bruto_g));
+    }
+    // Ordenar muestras por muestra_num
+    for(const wid in SIMSA.weeks){
+      for(const fid in SIMSA.weeks[wid].flavors){
+        const fd=SIMSA.weeks[wid].flavors[fid];
+        // ya vienen ordenadas del select, pero por si acaso
+      }
+    }
+    saveSimsaLocal();
+    setSyncStatus('ok','Guardado ✓');
+  }catch(err){
+    console.warn('SIMSA Supabase error, usando local:',err);
+    loadSimsaLocal();
+    setSyncStatus('err','Error SIMSA');
+  }
+}
+
+// ── Guardar semana SIMSA ──────────────────────────────────
+async function saveSimsaSemanaDB(wid, w){
+  if(!SUPABASE_CONFIGURED) return;
+  const {error} = await _supa.from('simsa_semanas').upsert({
+    id: wid, semana_num: w.weekNum, anio: w.year,
+    fecha_ini: w.dateStart, fecha_fin: w.dateEnd,
+    empaque_sachet_g: w.empaqueSachet||0,
+    empaque_paquete_g: w.empaquePaquete||0
+  });
+  if(error) toast('⚠ Error guardando semana SIMSA: '+error.message, true);
+}
+
+// ── Guardar sabor completo (meta + muestras) ─────────────
+async function saveSimsaSaborDB(wid, fid, fd){
+  if(!SUPABASE_CONFIGURED) return;
+  setSyncStatus('syncing','Guardando...');
+  // Upsert sabor meta
+  const {error:e1} = await _supa.from('simsa_sabores').upsert({
+    semana_id: wid, sabor_id: fid,
+    fecha_elab: fd.fechaElab||null, fecha_venc: fd.fechaVenc||null, lote: fd.op||null
+  },{onConflict:'semana_id,sabor_id'});
+  if(e1){ toast('⚠ Error guardando sabor: '+e1.message,true); return; }
+
+  // Borrar muestras previas de este sabor
+  await _supa.from('simsa_muestras').delete().match({semana_id:wid, sabor_id:fid});
+
+  // Insertar sachet + paquete
+  const rows=[];
+  (fd.sachet||[]).forEach((v,i)=>rows.push({semana_id:wid,sabor_id:fid,tipo:'sachet',muestra_num:i+1,peso_bruto_g:v}));
+  (fd.paquete||[]).forEach((v,i)=>rows.push({semana_id:wid,sabor_id:fid,tipo:'paquete',muestra_num:i+1,peso_bruto_g:v}));
+
+  if(rows.length){
+    const {error:e2} = await _supa.from('simsa_muestras').insert(rows);
+    if(e2){ toast('⚠ Error guardando muestras SIMSA: '+e2.message,true); return; }
+  }
+  setSyncStatus('ok','Guardado ✓');
+}
+
+// ── Borrar semana SIMSA ───────────────────────────────────
+async function deleteSimsaSemanaDB(wid){
+  if(!SUPABASE_CONFIGURED) return;
+  await _supa.from('simsa_semanas').delete().eq('id',wid);
+}
+
 async function goSimsa(){
-  loadSimsaLocal();
   showPage('simsaPage');
   setNavActive('gnavSimsa');
   pushBack(()=>goHome());
   document.getElementById('hdrBtns').innerHTML='';
-  // Show list sub-page, hide detail
   document.getElementById('simsaListPage').style.display='block';
   document.getElementById('simsaDetailPage').style.display='none';
-  // Set SIMSA banner image
   const imgEl=document.getElementById('simsaBannerImg');
   if(imgEl) imgEl.src=SIMSA_IMG;
+  await loadSimsaFromSupabase();
   renderSimsaWeekList();
 }
 
@@ -2722,7 +2816,7 @@ function previewSimsaWeek(){
   document.getElementById('simsaNWPreview').textContent=
     `Semana ${wn} · ${s.toLocaleDateString('es-MX',{day:'2-digit',month:'long'})} al ${e.toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'})}`;
 }
-function createSimsaWeek(){
+async function createSimsaWeek(){
   const sv=document.getElementById('simsaNWStart').value;
   if(!sv){ toast('⚠ Selecciona fecha',true); return; }
   const s=new Date(sv+'T00:00:00');
@@ -2730,13 +2824,15 @@ function createSimsaWeek(){
   const wn=isoWeek(sv), year=s.getFullYear();
   const wid=`sw_${year}_${String(wn).padStart(2,'0')}`;
   if(SIMSA.weeks[wid]){ toast(`⚠ Semana ${wn} ya existe`,true); closeM('modalSimsaNW'); openSimsaWeek(wid); return; }
-  SIMSA.weeks[wid]={
+  const newW={
     weekNum:wn, year,
     dateStart:sv, dateEnd:e.toISOString().split('T')[0],
     empaqueSachet:0, empaquePaquete:0,
     flavors:{}
   };
+  SIMSA.weeks[wid]=newW;
   saveSimsaLocal();
+  await saveSimsaSemanaDB(wid, newW);
   closeM('modalSimsaNW');
   simsaCurWeek=wid;
   renderSimsaWeekList();
@@ -2744,7 +2840,7 @@ function createSimsaWeek(){
   toast(`✅ Semana ${wn}/${year} creada`);
 }
 
-function deleteSimsaWeek(wid){
+async function deleteSimsaWeek(wid){
   const w=SIMSA.weeks[wid];
   if(!confirm(`¿Borrar semana ${w.weekNum}/${w.year}? Se perderán todos los datos.`)) return;
   delete SIMSA.weeks[wid];
@@ -2754,6 +2850,7 @@ function deleteSimsaWeek(wid){
     document.getElementById('simsaDetailPage').style.display='none';
   }
   saveSimsaLocal();
+  await deleteSimsaSemanaDB(wid);
   renderSimsaWeekList();
   toast('🗑 Semana eliminada');
 }
@@ -2879,36 +2976,37 @@ function updateSimsaPreview(){
   syncSimsaGrid('simsaPaqueteGrid');
 }
 
-function saveSimsaFlavor(){
+async function saveSimsaFlavor(){
   if(!simsaCurWeek){ toast('⚠ Selecciona una semana primero',true); return; }
   const w=SIMSA.weeks[simsaCurWeek];
   if(!w.flavors) w.flavors={};
-  // Read from grids
   const table_s=document.getElementById('simsaSachetGrid');
   const table_p=document.getElementById('simsaPaqueteGrid');
   const sv=[]; table_s.querySelectorAll('input').forEach(inp=>{ const v=parseFloat(inp.value); if(!isNaN(v)&&inp.value.trim()!=='') sv.push(v); });
   const pv=[]; table_p.querySelectorAll('input').forEach(inp=>{ const v=parseFloat(inp.value); if(!isNaN(v)&&inp.value.trim()!=='') pv.push(v); });
-  // Read meta
   const fechaElab=document.getElementById('simsaFechaElab').value||'';
   const fechaVenc=document.getElementById('simsaFechaVenc').value||'';
   const op=document.getElementById('simsaOp').value.trim()||'';
-  w.flavors[simsaCurFlavor]={sachet:sv, paquete:pv, fechaElab, fechaVenc, op};
-  // Save empaque values
+  const fd={sachet:sv, paquete:pv, fechaElab, fechaVenc, op};
+  w.flavors[simsaCurFlavor]=fd;
   w.empaqueSachet=parseFloat(document.getElementById('simsaEmpaqueSachet').value)||0;
   w.empaquePaquete=parseFloat(document.getElementById('simsaEmpaquePaquete').value)||0;
   saveSimsaLocal();
+  await saveSimsaSemanaDB(simsaCurWeek, w);
+  await saveSimsaSaborDB(simsaCurWeek, simsaCurFlavor, fd);
   renderSimsaFlavorTabs();
   renderSimsaFlavorSummary();
   renderSimsaChart();
   toast(`✅ Datos de "${SIMSA_FLAVORS.find(f=>f.id===simsaCurFlavor).name}" guardados`);
 }
 
-function recalcSimsa(){
+async function recalcSimsa(){
   if(!simsaCurWeek) return;
   const w=SIMSA.weeks[simsaCurWeek];
   w.empaqueSachet=parseFloat(document.getElementById('simsaEmpaqueSachet').value)||0;
   w.empaquePaquete=parseFloat(document.getElementById('simsaEmpaquePaquete').value)||0;
   saveSimsaLocal();
+  await saveSimsaSemanaDB(simsaCurWeek, w);
   renderSimsaFlavorSummary();
   renderSimsaChart();
 }
