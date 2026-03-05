@@ -1906,8 +1906,8 @@ function renderChartSingleDay(){
   };
   const datasets=[ds,
     {label:'Ideal',type:'line',data:[{x:0,y:c.ideal},{x:maxS+1,y:c.ideal}],borderColor:'#00e5a0',borderWidth:2.5,pointRadius:0},
-    {label:'Lím sup',type:'line',data:[{x:0,y:c.limSup},{x:maxS+1,y:c.limSup}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0},
-    {label:'Lím inf',type:'line',data:[{x:0,y:c.limInf},{x:maxS+1,y:c.limInf}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0}
+    {label:'Lím sup',type:'line',data:[{x:0,y:c.limSup},{x:maxS+1,y:c.limSup}],borderColor:'#3b82f6',borderWidth:1.5,borderDash:[6,4],pointRadius:0},
+    {label:'Lím inf',type:'line',data:[{x:0,y:c.limInf},{x:maxS+1,y:c.limInf}],borderColor:'#3b82f6',borderWidth:1.5,borderDash:[6,4],pointRadius:0}
   ];
   if(chartDS) chartDS.destroy();
   chartDS=new Chart(canvas,{
@@ -1984,8 +1984,8 @@ function renderChartD(){
   });
   datasets.push(
     {label:'Ideal',type:'line',data:[{x:0,y:c.ideal},{x:maxS+1,y:c.ideal}],borderColor:'#00e5a0',borderWidth:2.5,pointRadius:0},
-    {label:'Lím sup',type:'line',data:[{x:0,y:c.limSup},{x:maxS+1,y:c.limSup}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0},
-    {label:'Lím inf',type:'line',data:[{x:0,y:c.limInf},{x:maxS+1,y:c.limInf}],borderColor:'#ffd166',borderWidth:1.5,borderDash:[6,4],pointRadius:0}
+    {label:'Lím sup',type:'line',data:[{x:0,y:c.limSup},{x:maxS+1,y:c.limSup}],borderColor:'#3b82f6',borderWidth:1.5,borderDash:[6,4],pointRadius:0},
+    {label:'Lím inf',type:'line',data:[{x:0,y:c.limInf},{x:maxS+1,y:c.limInf}],borderColor:'#3b82f6',borderWidth:1.5,borderDash:[6,4],pointRadius:0}
   );
   if(chartD) chartD.destroy();
   chartD=new Chart(canvas,{
@@ -2034,8 +2034,8 @@ function renderChartW(){
        borderWidth:promedios.map((_,i)=>i===activeDay2?3:1.5),
        borderRadius:8,barThickness:42},
       {label:'Ideal',type:'line',data:Array(6).fill(c.ideal),borderColor:'#00e5a0',borderWidth:2.5,pointRadius:0,order:0},
-      {label:'Lím sup',type:'line',data:Array(6).fill(c.limSup),borderColor:'#ffd166',borderWidth:2,borderDash:[7,4],pointRadius:0,order:0},
-      {label:'Lím inf',type:'line',data:Array(6).fill(c.limInf),borderColor:'#ffd166',borderWidth:2,borderDash:[7,4],pointRadius:0,order:0},
+      {label:'Lím sup',type:'line',data:Array(6).fill(c.limSup),borderColor:'#3b82f6',borderWidth:2,borderDash:[7,4],pointRadius:0,order:0},
+      {label:'Lím inf',type:'line',data:Array(6).fill(c.limInf),borderColor:'#3b82f6',borderWidth:2,borderDash:[7,4],pointRadius:0,order:0},
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,animation:{duration:500},
@@ -2094,7 +2094,7 @@ function doPrint(mode='week'){
     const _col=DCOL[S.cur.day];
     document.getElementById('chartLegend1').innerHTML=legItemHTML(dayName,_col,_st)+`
       <div class="leg-item"><div class="leg-line" style="background:#00e5a0"></div>Ideal</div>
-      <div class="leg-item"><div class="leg-dash" style="border-color:#ffd166"></div>Límites</div>`;
+      <div class="leg-item"><div class="leg-dash" style="border-color:#3b82f6"></div>Límites</div>`;
     const n=dayData.length;
     const rowsPerMini=20;
     const numMinis=Math.ceil(n/rowsPerMini);
@@ -2162,7 +2162,7 @@ function doPrint(mode='week'){
       return legItemHTML(name, col, st);
     }).join('')+`
       <div class="leg-item"><div class="leg-line" style="background:#00e5a0"></div>Ideal</div>
-      <div class="leg-item"><div class="leg-dash" style="border-color:#ffd166"></div>Límites</div>`;
+      <div class="leg-item"><div class="leg-dash" style="border-color:#3b82f6"></div>Límites</div>`;
     let summaryRows='';
     DAYS.forEach((dname,i)=>{
       const d=w.data[i]||[];
@@ -3098,8 +3098,8 @@ function renderSimsaChart(){
         {label:`Promedio neto (${isSachet?'Sachet':'Paquete'})`,data:values,
          backgroundColor:colors,borderColor:borderColors,borderWidth:2,borderRadius:8,barThickness:48},
         {label:'Ideal',type:'line',data:Array(labels.length).fill(ideal),borderColor:'#00e5a0',borderWidth:2.5,pointRadius:0},
-        {label:'Lím sup',type:'line',data:Array(labels.length).fill(ls),borderColor:'#ffd166',borderWidth:2,borderDash:[7,4],pointRadius:0},
-        {label:'Lím inf',type:'line',data:Array(labels.length).fill(li),borderColor:'#ffd166',borderWidth:2,borderDash:[7,4],pointRadius:0},
+        {label:'Lím sup',type:'line',data:Array(labels.length).fill(ls),borderColor:'#3b82f6',borderWidth:2,borderDash:[7,4],pointRadius:0},
+        {label:'Lím inf',type:'line',data:Array(labels.length).fill(li),borderColor:'#3b82f6',borderWidth:2,borderDash:[7,4],pointRadius:0},
       ]
     },
     options:{
