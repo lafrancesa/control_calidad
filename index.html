@@ -562,6 +562,8 @@ input[type=file]{display:none;}
       <table class="print-info-table" id="pTableLote"></table>
       <div class="print-info-section">Estadísticas</div>
       <table class="print-info-table" id="pTableStats"></table>
+      <div class="print-info-section" id="pObsSection">Observaciones</div>
+      <table class="print-info-table" id="pTableObs"></table>
     </div>
     <div class="print-charts-col" id="pChartsCol"></div>
   </div>
@@ -2095,6 +2097,9 @@ function doPrint(mode='week'){
       <tr><td>No conforme</td><td><strong>${nc}</strong> (${((nc/dayData.length)*100).toFixed(1)}%)</td></tr>
       ${dayInfo.obs?`<tr><td>Observaciones</td><td style="font-style:italic;white-space:normal">${dayInfo.obs}</td></tr>`:''}`;
     document.getElementById('pTableStats').innerHTML='';
+    document.getElementById('pObsSection').style.display='none';
+    document.getElementById('pTableObs').innerHTML='';
+    document.getElementById('pTableObs').style.display='none';
     const _st=DSTYLE[S.cur.day];
     const _col=DCOL[S.cur.day];
     document.getElementById('chartLegend1').innerHTML=legItemHTML(dayName,_col,_st)+`
@@ -2159,6 +2164,21 @@ function doPrint(mode='week'){
       <tr><td>Empaque</td><td>${c.empaque} g</td></tr>`;
     document.getElementById('pTableLote').innerHTML='';
     document.getElementById('pTableStats').innerHTML='';
+    // Observaciones en columna izquierda — solo días con obs
+    let obsHTML='';
+    DAYS.forEach((dname,i)=>{
+      const inf=di[i]||{};
+      if(inf.obs&&inf.obs.trim()) obsHTML+=`<tr><td style="white-space:nowrap">${dname}</td><td style="font-style:italic;white-space:normal">${inf.obs.trim()}</td></tr>`;
+    });
+    if(obsHTML){
+      document.getElementById('pObsSection').style.display='block';
+      document.getElementById('pTableObs').innerHTML=obsHTML;
+      document.getElementById('pTableObs').style.display='table';
+    } else {
+      document.getElementById('pObsSection').style.display='none';
+      document.getElementById('pTableObs').innerHTML='';
+      document.getElementById('pTableObs').style.display='none';
+    }
     const allDays=[];
     DAYS.forEach((name,i)=>{ const d=w.data[i]||[]; if(d.length) allDays.push({name,i}); });
     document.getElementById('chartLegend1').innerHTML=allDays.map(({name,i})=>{
@@ -2193,21 +2213,11 @@ function doPrint(mode='week'){
     });
     const weekSummaryCard=document.createElement('div');
     weekSummaryCard.className='print-week-summary-card';
-    // Build observations block — only days with obs
-    let obsRows='';
-    DAYS.forEach((dname,i)=>{
-      const inf=di[i]||{};
-      if(inf.obs&&inf.obs.trim()) obsRows+=`<tr><td style="font-weight:700;white-space:nowrap;padding-right:4px">${dname}</td><td style="font-style:italic">${inf.obs.trim()}</td></tr>`;
-    });
-    const obsBlock=obsRows?`<div style="margin-top:3mm;font-size:8pt;font-weight:700;font-family:Arial;margin-bottom:1mm;color:#000">Observaciones</div>
-      <table style="width:100%;border-collapse:collapse;font-size:7pt;font-family:Arial">
-        ${obsRows}
-      </table>`:'';
     weekSummaryCard.innerHTML=`<div style="font-size:8pt;font-weight:700;font-family:Arial;margin-bottom:2mm;color:#000">Resumen de la semana</div>
       <table class="print-week-summary-table">
         <thead><tr><th>Día</th><th>Lote</th><th>Empaquetado</th><th>Vencimiento</th><th>N</th><th>Promedio</th><th>Mín</th><th>Máx</th><th>No conf.</th></tr></thead>
         <tbody>${summaryRows||'<tr><td colspan="9">Sin datos</td></tr>'}</tbody>
-      </table>${obsBlock}`;
+      </table>`;
     pCol.className='print-charts-col';
     pCol.appendChild(c1);
     pCol.appendChild(c2);
@@ -2222,8 +2232,7 @@ function doPrint(mode='week'){
     document.getElementById('printSheet').style.display='none';
     document.getElementById('pshHeader').style.display='none';
     document.querySelectorAll('.print-info-table').forEach(t=>t.style.display='none');
-    document.querySelectorAll('.print-info-section').forEach(s=>s.style.display='none');
-    const sumCard=pCol.querySelector('.print-week-summary-card');
+    document.querySelectorAll('.print-info-section').forEach(s=>s.style.display='none');    const sumCard=pCol.querySelector('.print-week-summary-card');
     if(sumCard) pCol.removeChild(sumCard);
     c2.className='chart-card';
     c2.innerHTML=`<div class="chart-hdr"><div>
