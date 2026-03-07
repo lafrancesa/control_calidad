@@ -2193,11 +2193,21 @@ function doPrint(mode='week'){
     });
     const weekSummaryCard=document.createElement('div');
     weekSummaryCard.className='print-week-summary-card';
+    // Build observations block — only days with obs
+    let obsRows='';
+    DAYS.forEach((dname,i)=>{
+      const inf=di[i]||{};
+      if(inf.obs&&inf.obs.trim()) obsRows+=`<tr><td style="font-weight:700;white-space:nowrap;padding-right:4px">${dname}</td><td style="font-style:italic">${inf.obs.trim()}</td></tr>`;
+    });
+    const obsBlock=obsRows?`<div style="margin-top:3mm;font-size:8pt;font-weight:700;font-family:Arial;margin-bottom:1mm;color:#000">Observaciones</div>
+      <table style="width:100%;border-collapse:collapse;font-size:7pt;font-family:Arial">
+        ${obsRows}
+      </table>`:'';
     weekSummaryCard.innerHTML=`<div style="font-size:8pt;font-weight:700;font-family:Arial;margin-bottom:2mm;color:#000">Resumen de la semana</div>
       <table class="print-week-summary-table">
         <thead><tr><th>Día</th><th>Lote</th><th>Empaquetado</th><th>Vencimiento</th><th>N</th><th>Promedio</th><th>Mín</th><th>Máx</th><th>No conf.</th></tr></thead>
         <tbody>${summaryRows||'<tr><td colspan="9">Sin datos</td></tr>'}</tbody>
-      </table>`;
+      </table>${obsBlock}`;
     pCol.className='print-charts-col';
     pCol.appendChild(c1);
     pCol.appendChild(c2);
