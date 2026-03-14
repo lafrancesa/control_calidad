@@ -466,6 +466,10 @@ input[type=file]{display:none;}
 .simsa-grid-table td{padding:0;border:1px solid var(--gris-borde);}
 .simsa-grid-table td input{width:100%;border:none;background:white;padding:3px 4px;font-size:9px;font-family:'DM Mono',monospace;font-weight:700;color:var(--text-osc);text-align:right;outline:none;min-width:38px;}
 .simsa-grid-table td input:focus{background:#FFF4EC;color:var(--naranja-osc);}
+/* ── Quitar flechitas de todos los inputs numéricos ── */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+input[type=number]{-moz-appearance:textfield;}
 </style>
 </head>
 <body>
@@ -882,8 +886,13 @@ input[type=file]{display:none;}
 
   <!-- SUB-PÁGINA 2: Detalle de semana -->
   <div id="simsaDetailPage" style="display:none;max-width:1200px;margin:0 auto;padding:28px 22px;">
+    <!-- Banner semana cerrada -->
+    <div id="simsaLockedBanner" style="display:none;background:#fff3f3;border:2px solid var(--rojo);border-radius:10px;padding:10px 16px;margin-bottom:14px;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-size:13px;font-weight:800;color:var(--rojo)">🔒 Semana cerrada — solo lectura</span>
+      <button class="btn btn-secondary btn-sm" onclick="askEditSimsaLocked()">✏️ Editar semana</button>
+    </div>
     <!-- Breadcrumb semana -->
-    <div id="simsaWeekBreadcrumb" style="font-size:12px;font-family:'DM Mono',monospace;color:var(--gris-text);margin-bottom:18px;padding:10px 14px;background:white;border:1.5px solid var(--gris-borde);border-radius:8px;display:flex;align-items:center;gap:8px;"></div>
+    <div id="simsaWeekBreadcrumb" style="font-size:12px;font-family:'DM Mono',monospace;color:var(--gris-text);margin-bottom:18px;padding:10px 14px;background:white;border:1.5px solid var(--gris-borde);border-radius:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between;"></div>
 
     <!-- Pesos de empaque -->
     <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
@@ -1385,6 +1394,7 @@ function checkPwd(){
   else if(pwdAction==='edit') openEditCookieModal(editCookieId);
   else if(pwdAction==='editLocked') unlockForEdit();
   else if(pwdAction==='editCM'){ openModalCMEdit(_cmEditPendingId); _cmEditPendingId=null; }
+  else if(pwdAction==='editSimsaLocked') unlockSimsaForEdit();
 }
 function openEditCookieModal(id){
   isEditMode=true; editingCookieId=id;
@@ -2710,6 +2720,7 @@ async function loadSimsaFromSupabase(){
         dateStart: s.fecha_ini, dateEnd: s.fecha_fin,
         empaqueSachet: parseFloat(s.empaque_sachet_g)||0,
         empaquePaquete: parseFloat(s.empaque_paquete_g)||0,
+        locked: s.bloqueada||false,
         flavors:{}
       };
     }
@@ -2746,7 +2757,8 @@ async function saveSimsaSemanaDB(wid, w){
     id: wid, semana_num: w.weekNum, anio: w.year,
     fecha_ini: w.dateStart, fecha_fin: w.dateEnd,
     empaque_sachet_g: w.empaqueSachet||0,
-    empaque_paquete_g: w.empaquePaquete||0
+    empaque_paquete_g: w.empaquePaquete||0,
+    bloqueada: w.locked||false
   });
   if(error) toast('⚠ Error guardando semana SIMSA: '+error.message, true);
 }
@@ -2883,22 +2895,59 @@ async function deleteSimsaWeek(wid){
   toast('🗑 Semana eliminada');
 }
 
+function lockSimsaWeek(wid){
+  if(!confirm('¿Cerrar esta semana? Después solo se podrá editar con contraseña.')) return;
+  SIMSA.weeks[wid].locked=true;
+  saveSimsaLocal();
+  saveSimsaSemanaDB(wid, SIMSA.weeks[wid]);
+  openSimsaWeek(wid);
+  toast('🔒 Semana cerrada');
+}
+
+function askEditSimsaLocked(){
+  pwdAction='editSimsaLocked';
+  document.getElementById('pwdInput').value='';
+  document.getElementById('pwdErr').style.display='none';
+  document.querySelector('#modalPwd p').textContent='Contraseña requerida para editar una semana cerrada de SIMSA.';
+  openM('modalPwd');
+}
+
+function unlockSimsaForEdit(){
+  SIMSA.weeks[simsaCurWeek].locked=false;
+  saveSimsaLocal();
+  saveSimsaSemanaDB(simsaCurWeek, SIMSA.weeks[simsaCurWeek]);
+  toast('🔓 Semana desbloqueada');
+  openSimsaWeek(simsaCurWeek);
+}
+
 function openSimsaWeek(wid){
   simsaCurWeek=wid;
   const w=SIMSA.weeks[wid];
-  // Switch to detail sub-page
   document.getElementById('simsaListPage').style.display='none';
   document.getElementById('simsaDetailPage').style.display='block';
-  // Push back to list
   pushBack(()=>{
     document.getElementById('simsaListPage').style.display='block';
     document.getElementById('simsaDetailPage').style.display='none';
     renderSimsaWeekList();
   });
+  const locked=w.locked||false;
+  // Banner bloqueado
+  const banner=document.getElementById('simsaLockedBanner');
+  banner.style.display=locked?'flex':'none';
+  // Breadcrumb con botón cerrar o indicador de cerrada
   document.getElementById('simsaWeekBreadcrumb').innerHTML=
-    `🍪 SIMSA · <b>Semana ${w.weekNum} / ${w.year}</b> · ${fmtDL(w.dateStart)} al ${fmtDL(w.dateEnd)}`;
+    `<span>🍪 SIMSA · <b>Semana ${w.weekNum} / ${w.year}</b> · ${fmtDL(w.dateStart)} al ${fmtDL(w.dateEnd)}</span>
+     ${locked
+       ? `<span style="color:var(--rojo);font-size:11px;font-weight:800">🔒 Cerrada</span>`
+       : `<button class="btn btn-secondary btn-sm print-hide" onclick="lockSimsaWeek('${wid}')">🔒 Cerrar semana</button>`}`;
   document.getElementById('simsaEmpaqueSachet').value = w.empaqueSachet||0;
   document.getElementById('simsaEmpaquePaquete').value = w.empaquePaquete||0;
+  // Deshabilitar inputs y botones de edición si está cerrada
+  setTimeout(()=>{
+    document.querySelectorAll('#simsaDetailPage input, #simsaDetailPage textarea, #simsaDetailPage button.btn-primary').forEach(el=>{
+      if(!el.closest('#simsaLockedBanner')&&!el.closest('#simsaWeekBreadcrumb')) el.disabled=locked;
+    });
+  }, 50);
   renderSimsaFlavorTabs();
   selectSimsaFlavor(simsaCurFlavor);
   renderSimsaFlavorSummary();
@@ -2969,8 +3018,8 @@ function simsaGridNav(e,row,col,tableId){
   let nr=row,nc=col;
   if(e.key==='Enter'||e.key==='ArrowDown') nr++;
   else if(e.key==='ArrowUp') nr--;
-  else if(e.key==='ArrowRight'&&e.target.selectionStart===e.target.value.length) nc++;
-  else if(e.key==='ArrowLeft'&&e.target.selectionStart===0) nc--;
+  else if(e.key==='ArrowRight') nc++;
+  else if(e.key==='ArrowLeft') nc--;
   else return;
   if(nc<0){nc=COLS-1;nr--;} if(nc>=COLS){nc=0;nr++;}
   if(nr<0||nr>=ROWS) return;
