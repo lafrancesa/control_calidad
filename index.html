@@ -2699,7 +2699,8 @@ async function loadSimsaFromSupabase(){
     if(e1) throw e1;
     const {data:sabores, error:e2} = await _supa.from('simsa_sabores').select('*');
     if(e2) throw e2;
-    const {data:muestras, error:e3} = await _supa.from('simsa_muestras').select('*');
+    // Ordenar por muestra_num y traer sin límite de 1000 filas
+    const {data:muestras, error:e3} = await _supa.from('simsa_muestras').select('*').order('muestra_num',{ascending:true}).limit(10000);
     if(e3) throw e3;
 
     SIMSA.weeks={};
@@ -2720,18 +2721,14 @@ async function loadSimsaFromSupabase(){
         fechaElab: sb.fecha_elab||'', fechaVenc: sb.fecha_venc||'', op: sb.lote||''
       };
     }
-    // Cargar muestras
+    // Cargar muestras — si falta la fila en simsa_sabores se crea igual
     for(const m of muestras){
       const w=SIMSA.weeks[m.semana_id];
-      if(!w||!w.flavors[m.sabor_id]) continue;
-      w.flavors[m.sabor_id][m.tipo].push(parseFloat(m.peso_bruto_g));
-    }
-    // Ordenar muestras por muestra_num
-    for(const wid in SIMSA.weeks){
-      for(const fid in SIMSA.weeks[wid].flavors){
-        const fd=SIMSA.weeks[wid].flavors[fid];
-        // ya vienen ordenadas del select, pero por si acaso
+      if(!w) continue;
+      if(!w.flavors[m.sabor_id]){
+        w.flavors[m.sabor_id]={sachet:[], paquete:[], fechaElab:'', fechaVenc:'', op:''};
       }
+      w.flavors[m.sabor_id][m.tipo].push(parseFloat(m.peso_bruto_g));
     }
     saveSimsaLocal();
     setSyncStatus('ok','Guardado ✓');
