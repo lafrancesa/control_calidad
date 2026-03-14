@@ -505,8 +505,8 @@ input[type=number]{-moz-appearance:textfield;}
 <!-- HOME -->
 <div class="page active" id="homePage">
   <div class="home-hero">
-    <h2>CONTROL DE CALIDAD</h2>
-    <p>Gestión de pesos</p>
+    <h2>Control de Calidad</h2>
+    <p>Gestión de pesos por tipo de galleta y semana</p>
     <div class="home-hero-btns">
       <button class="btn btn-primary" onclick="askPwd()">➕ Nueva Galleta</button>
       <button class="btn btn-secondary" onclick="goContramuestras()" style="background:white;border:2px solid var(--naranja);color:var(--naranja-osc)">🧪 Registro de Contramuestras</button>
@@ -2971,14 +2971,17 @@ function buildSimsaGrid(tableId, vals){
   const COLS=6, ROWS=10;
   const table=document.getElementById(tableId);
   if(!table) return;
+  // Convertir array columna-por-columna a matriz fila×columna para mostrar
+  // vals está guardado: col0r0,col0r1,...,col0r9, col1r0,...
+  // La celda [r][c] corresponde al índice c*ROWS+r en el array
   let html='<thead><tr>';
   for(let c=0;c<COLS;c++) html+=`<th>Col ${c+1}</th>`;
   html+='</tr></thead><tbody>';
   for(let r=0;r<ROWS;r++){
     html+='<tr>';
     for(let c=0;c<COLS;c++){
-      const idx=r*COLS+c;
-      const v=vals&&vals[idx]!==undefined?vals[idx]:'';
+      const idx=c*ROWS+r;
+      const v=vals&&vals[idx]!==undefined&&vals[idx]!==''?vals[idx]:'';
       html+=`<td><input type="number" step="any" value="${v}" placeholder="—"
         oninput="syncSimsaGrid('${tableId}')"
         onkeydown="simsaGridNav(event,${r},${c},'${tableId}')"></td>`;
@@ -3057,10 +3060,26 @@ async function saveSimsaFlavor(){
   if(!simsaCurWeek){ toast('⚠ Selecciona una semana primero',true); return; }
   const w=SIMSA.weeks[simsaCurWeek];
   if(!w.flavors) w.flavors={};
-  const table_s=document.getElementById('simsaSachetGrid');
-  const table_p=document.getElementById('simsaPaqueteGrid');
-  const sv=[]; table_s.querySelectorAll('input').forEach(inp=>{ const v=parseFloat(inp.value); if(!isNaN(v)&&inp.value.trim()!=='') sv.push(v); });
-  const pv=[]; table_p.querySelectorAll('input').forEach(inp=>{ const v=parseFloat(inp.value); if(!isNaN(v)&&inp.value.trim()!=='') pv.push(v); });
+  const COLS=6, ROWS=10;
+  // Leer columna por columna (c*ROWS+r = posición en el array guardado)
+  function readGridColByCol(tableId){
+    const table=document.getElementById(tableId);
+    if(!table) return [];
+    const all=table.querySelectorAll('input');
+    const vals=[];
+    for(let c=0;c<COLS;c++){
+      for(let r=0;r<ROWS;r++){
+        const inp=all[r*COLS+c];
+        if(inp&&inp.value.trim()!==''){
+          const v=parseFloat(inp.value);
+          if(!isNaN(v)) vals.push(v);
+        }
+      }
+    }
+    return vals;
+  }
+  const sv=readGridColByCol('simsaSachetGrid');
+  const pv=readGridColByCol('simsaPaqueteGrid');
   const fechaElab=document.getElementById('simsaFechaElab').value||'';
   const fechaVenc=document.getElementById('simsaFechaVenc').value||'';
   const op=document.getElementById('simsaOp').value.trim()||'';
