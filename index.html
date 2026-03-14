@@ -479,7 +479,7 @@ input[type=number]{-moz-appearance:textfield;}
     <div class="logo-icon"><img src="https://ik.imagekit.io/am3aa3uiq/la-francesa-ltda-logo_18190_220516102235.jpg" alt="La Francesa Logo" onerror="this.style.display='none';this.parentNode.innerHTML='⚖️'"></div>
     <div>
       <h1>Control de Calidad — La Francesa</h1>
-      <p>Sistema de Pesos · Norma QC</p>
+      <p>Sistema de Pesos · Norma NB 21003</p>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:14px">
@@ -505,8 +505,8 @@ input[type=number]{-moz-appearance:textfield;}
 <!-- HOME -->
 <div class="page active" id="homePage">
   <div class="home-hero">
-    <h2>Control de Calidad</h2>
-    <p>Gestión de pesos por tipo de galleta y semana</p>
+    <h2>CONTROL DE CALIDAD</h2>
+    <p>Gestión de pesos</p>
     <div class="home-hero-btns">
       <button class="btn btn-primary" onclick="askPwd()">➕ Nueva Galleta</button>
       <button class="btn btn-secondary" onclick="goContramuestras()" style="background:white;border:2px solid var(--naranja);color:var(--naranja-osc)">🧪 Registro de Contramuestras</button>
@@ -601,7 +601,7 @@ input[type=number]{-moz-appearance:textfield;}
           <button class="btn btn-primary btn-sm" style="width:100%;margin-top:9px" onclick="saveObservaciones()">Guardar observación</button>
         </div>
         <div class="card">
-          <div class="card-title">📥 Ingresar datos <button class="grid-toggle-btn" onclick="toggleGridInput()" title="Abrir tabla de ingreso">🗃️</button></div>
+          <div class="card-title">📥 Ingresar datos <button class="grid-toggle-btn" onclick="toggleGridInput()" title="Abrir tabla de ingreso">🗃️</button> <button onclick="copyGalletasGrid()" title="Copiar tabla" style="border:1px solid var(--gris-borde);background:var(--gris-f);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;color:var(--gris-text);transition:.15s;" onmouseover="this.style.borderColor='var(--naranja)';this.style.color='var(--naranja-osc)'" onmouseout="this.style.borderColor='var(--gris-borde)';this.style.color='var(--gris-text)'">📋</button></div>
           <textarea class="data-input" id="dataInput" placeholder="Pega los pesos aquí...&#10;(columna de Excel, comas, espacios...)"></textarea>
           <div class="hint">⚡ Cualquier cantidad · Se resta empaque automático</div>
           <div class="grid-input-wrap" id="gridInputWrap">
@@ -937,14 +937,20 @@ input[type=number]{-moz-appearance:textfield;}
         </div>
         <div class="simsa-data-grid">
           <div class="simsa-input-card">
-            <div class="simsa-input-title">📦 Datos Sachet — 60 pesos brutos</div>
+            <div class="simsa-input-title" style="display:flex;align-items:center;justify-content:space-between;">
+              <span>📦 Datos Sachet — 60 pesos brutos</span>
+              <button onclick="copySimsaGrid('simsaSachetGrid')" title="Copiar tabla" style="border:1px solid var(--gris-borde);background:var(--gris-f);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;color:var(--gris-text);transition:.15s;" onmouseover="this.style.borderColor='var(--naranja)';this.style.color='var(--naranja-osc)'" onmouseout="this.style.borderColor='var(--gris-borde)';this.style.color='var(--gris-text)'">📋</button>
+            </div>
             <div class="simsa-grid-wrap" style="margin-bottom:6px;">
               <table class="simsa-grid-table" id="simsaSachetGrid"></table>
             </div>
             <div class="hint" id="simsaSachetCount">0 / 60 datos</div>
           </div>
           <div class="simsa-input-card">
-            <div class="simsa-input-title">📦 Datos Paquete — 60 pesos brutos</div>
+            <div class="simsa-input-title" style="display:flex;align-items:center;justify-content:space-between;">
+              <span>📦 Datos Paquete — 60 pesos brutos</span>
+              <button onclick="copySimsaGrid('simsaPaqueteGrid')" title="Copiar tabla" style="border:1px solid var(--gris-borde);background:var(--gris-f);border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700;cursor:pointer;color:var(--gris-text);transition:.15s;" onmouseover="this.style.borderColor='var(--naranja)';this.style.color='var(--naranja-osc)'" onmouseout="this.style.borderColor='var(--gris-borde)';this.style.color='var(--gris-text)'">📋</button>
+            </div>
             <div class="simsa-grid-wrap" style="margin-bottom:6px;">
               <table class="simsa-grid-table" id="simsaPaqueteGrid"></table>
             </div>
@@ -2604,7 +2610,8 @@ function buildGridTable(){
       const idx = r * GRID_COLS + c;
       html += `<td><input type="number" step="any" id="gc_${idx}" placeholder="—"
         oninput="syncGridToTextarea()"
-        onkeydown="gridNavKey(event,${r},${c})"></td>`;
+        onkeydown="gridNavKey(event,${r},${c})"
+        onpaste="gridPaste(event,${r},${c})"></td>`;
     }
     html += '</tr>';
   }
@@ -2654,20 +2661,81 @@ function syncTextareaToGrid(){
 }
 
 function gridNavKey(e, row, col){
-  // Navegación con Enter/Tab/Flechas entre celdas
   let nr = row, nc = col;
   if(e.key === 'Enter' || e.key === 'ArrowDown'){ nr++; }
   else if(e.key === 'ArrowUp'){ nr--; }
   else if(e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length){ nc++; }
   else if(e.key === 'ArrowLeft' && e.target.selectionStart === 0){ nc--; }
+  else if((e.ctrlKey||e.metaKey) && e.key==='z'){ e.preventDefault(); gridUndo(); return; }
   else return;
-  // Wrapping columnas
   if(nc < 0){ nc = GRID_COLS-1; nr--; }
   if(nc >= GRID_COLS){ nc = 0; nr++; }
-  // Expandir filas si es necesario
   if(nr >= GRID_ROWS || nr < 0) return;
   const target = document.getElementById(`gc_${nr*GRID_COLS+nc}`);
   if(target){ e.preventDefault(); target.focus(); target.select(); }
+}
+
+// ── Historial de deshacer para galletas grid ──────────────
+let _gridHistory = [];
+function gridSaveHistory(){
+  const state=[];
+  for(let i=0;i<GRID_ROWS*GRID_COLS;i++){
+    const el=document.getElementById('gc_'+i);
+    state.push(el?el.value:'');
+  }
+  _gridHistory.push(state);
+  if(_gridHistory.length>20) _gridHistory.shift();
+}
+function gridUndo(){
+  if(!_gridHistory.length) return;
+  const state=_gridHistory.pop();
+  for(let i=0;i<GRID_ROWS*GRID_COLS;i++){
+    const el=document.getElementById('gc_'+i);
+    if(el) el.value=state[i];
+  }
+  syncGridToTextarea();
+  toast('↩ Deshacer');
+}
+
+function gridPaste(e, startRow, startCol){
+  const text = e.clipboardData.getData('text');
+  if(!text.includes('\t') && !text.includes('\n')){ return; }
+  e.preventDefault();
+  gridSaveHistory();
+  const rows = text.split(/\r?\n/).filter(r=>r.trim()!=='');
+  rows.forEach((rowStr, ri)=>{
+    const cells = rowStr.split('\t');
+    cells.forEach((val, ci)=>{
+      const tr=startRow+ri, tc=startCol+ci;
+      if(tr>=GRID_ROWS||tc>=GRID_COLS) return;
+      const el=document.getElementById(`gc_${tr*GRID_COLS+tc}`);
+      if(el){
+        const clean=val.trim().replace(',','.');
+        el.value=isNaN(parseFloat(clean))?'':parseFloat(clean);
+      }
+    });
+  });
+  syncGridToTextarea();
+}
+
+function copyGalletasGrid(){
+  let rows=[];
+  for(let r=0;r<GRID_ROWS;r++){
+    let row=[];
+    for(let c=0;c<GRID_COLS;c++){
+      const el=document.getElementById('gc_'+(r*GRID_COLS+c));
+      row.push(el&&el.value.trim()!==''?el.value.trim():'');
+    }
+    rows.push(row.join('\t'));
+  }
+  const text=rows.join('\n');
+  navigator.clipboard.writeText(text).then(()=>toast('📋 Tabla copiada')).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('📋 Tabla copiada');
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2971,20 +3039,18 @@ function buildSimsaGrid(tableId, vals){
   const COLS=6, ROWS=10;
   const table=document.getElementById(tableId);
   if(!table) return;
-  // Convertir array columna-por-columna a matriz fila×columna para mostrar
-  // vals está guardado: col0r0,col0r1,...,col0r9, col1r0,...
-  // La celda [r][c] corresponde al índice c*ROWS+r en el array
   let html='<thead><tr>';
   for(let c=0;c<COLS;c++) html+=`<th>Col ${c+1}</th>`;
   html+='</tr></thead><tbody>';
   for(let r=0;r<ROWS;r++){
     html+='<tr>';
     for(let c=0;c<COLS;c++){
-      const idx=c*ROWS+r;
+      const idx=r*COLS+c;
       const v=vals&&vals[idx]!==undefined&&vals[idx]!==''?vals[idx]:'';
       html+=`<td><input type="number" step="any" value="${v}" placeholder="—"
         oninput="syncSimsaGrid('${tableId}')"
-        onkeydown="simsaGridNav(event,${r},${c},'${tableId}')"></td>`;
+        onkeydown="simsaGridNav(event,${r},${c},'${tableId}')"
+        onpaste="simsaGridPaste(event,${r},${c},'${tableId}')"></td>`;
     }
     html+='</tr>';
   }
@@ -3016,6 +3082,22 @@ function syncSimsaGrid(tableId){
   document.getElementById(countId).textContent=`${vals.length} / 60 datos`;
 }
 
+// ── Historial deshacer SIMSA ──────────────────────────────
+let _simsaHistory={simsaSachetGrid:[],simsaPaqueteGrid:[]};
+function simsaSaveHistory(tableId){
+  const table=document.getElementById(tableId); if(!table) return;
+  const state=[]; table.querySelectorAll('input').forEach(inp=>state.push(inp.value));
+  _simsaHistory[tableId].push(state);
+  if(_simsaHistory[tableId].length>20) _simsaHistory[tableId].shift();
+}
+function simsaUndo(tableId){
+  if(!_simsaHistory[tableId]?.length) return;
+  const state=_simsaHistory[tableId].pop();
+  const table=document.getElementById(tableId); if(!table) return;
+  table.querySelectorAll('input').forEach((inp,i)=>{ inp.value=state[i]||''; });
+  syncSimsaGrid(tableId); toast('↩ Deshacer');
+}
+
 function simsaGridNav(e,row,col,tableId){
   const COLS=6,ROWS=10;
   let nr=row,nc=col;
@@ -3023,6 +3105,7 @@ function simsaGridNav(e,row,col,tableId){
   else if(e.key==='ArrowUp') nr--;
   else if(e.key==='ArrowRight') nc++;
   else if(e.key==='ArrowLeft') nc--;
+  else if((e.ctrlKey||e.metaKey)&&e.key==='z'){ e.preventDefault(); simsaUndo(tableId); return; }
   else return;
   if(nc<0){nc=COLS-1;nr--;} if(nc>=COLS){nc=0;nr++;}
   if(nr<0||nr>=ROWS) return;
@@ -3030,6 +3113,27 @@ function simsaGridNav(e,row,col,tableId){
   const all=table.querySelectorAll('input');
   const target=all[nr*COLS+nc];
   if(target){e.preventDefault();target.focus();target.select();}
+}
+
+function simsaGridPaste(e,startRow,startCol,tableId){
+  const COLS=6,ROWS=10;
+  const text=e.clipboardData.getData('text');
+  if(!text.includes('\t')&&!text.includes('\n')){ return; }
+  e.preventDefault();
+  simsaSaveHistory(tableId);
+  const table=document.getElementById(tableId);
+  const all=table.querySelectorAll('input');
+  const rows=text.split(/\r?\n/).filter(r=>r.trim()!=='');
+  rows.forEach((rowStr,ri)=>{
+    const cells=rowStr.split('\t');
+    cells.forEach((val,ci)=>{
+      const tr=startRow+ri, tc=startCol+ci;
+      if(tr>=ROWS||tc>=COLS) return;
+      const inp=all[tr*COLS+tc];
+      if(inp){ const clean=val.trim().replace(',','.'); inp.value=isNaN(parseFloat(clean))?'':parseFloat(clean); }
+    });
+  });
+  syncSimsaGrid(tableId);
 }
 
 function selectSimsaFlavor(fid){
@@ -3056,30 +3160,52 @@ function updateSimsaPreview(){
   syncSimsaGrid('simsaPaqueteGrid');
 }
 
+function copySimsaGrid(tableId){
+  const COLS=6, ROWS=10;
+  const table=document.getElementById(tableId);
+  if(!table) return;
+  const all=table.querySelectorAll('input');
+  let rows=[];
+  for(let r=0;r<ROWS;r++){
+    let row=[];
+    for(let c=0;c<COLS;c++){
+      const inp=all[r*COLS+c];
+      row.push(inp&&inp.value.trim()!==''?inp.value.trim():'');
+    }
+    rows.push(row.join('\t'));
+  }
+  const text=rows.join('\n');
+  navigator.clipboard.writeText(text).then(()=>{
+    toast('📋 Tabla copiada al portapapeles');
+  }).catch(()=>{
+    // Fallback para navegadores sin clipboard API
+    const ta=document.createElement('textarea');
+    ta.value=text; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('📋 Tabla copiada al portapapeles');
+  });
+}
+
 async function saveSimsaFlavor(){
   if(!simsaCurWeek){ toast('⚠ Selecciona una semana primero',true); return; }
   const w=SIMSA.weeks[simsaCurWeek];
   if(!w.flavors) w.flavors={};
-  const COLS=6, ROWS=10;
-  // Leer columna por columna (c*ROWS+r = posición en el array guardado)
-  function readGridColByCol(tableId){
+  // Leer fila por fila (igual que buildSimsaGrid usa r*COLS+c)
+  function readGrid(tableId){
     const table=document.getElementById(tableId);
     if(!table) return [];
-    const all=table.querySelectorAll('input');
     const vals=[];
-    for(let c=0;c<COLS;c++){
-      for(let r=0;r<ROWS;r++){
-        const inp=all[r*COLS+c];
-        if(inp&&inp.value.trim()!==''){
-          const v=parseFloat(inp.value);
-          if(!isNaN(v)) vals.push(v);
-        }
+    table.querySelectorAll('input').forEach(inp=>{
+      if(inp.value.trim()!==''){
+        const v=parseFloat(inp.value);
+        if(!isNaN(v)) vals.push(v);
       }
-    }
+    });
     return vals;
   }
-  const sv=readGridColByCol('simsaSachetGrid');
-  const pv=readGridColByCol('simsaPaqueteGrid');
+  const sv=readGrid('simsaSachetGrid');
+  const pv=readGrid('simsaPaqueteGrid');
   const fechaElab=document.getElementById('simsaFechaElab').value||'';
   const fechaVenc=document.getElementById('simsaFechaVenc').value||'';
   const op=document.getElementById('simsaOp').value.trim()||'';
