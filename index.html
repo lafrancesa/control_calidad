@@ -2664,8 +2664,8 @@ function gridNavKey(e, row, col){
   let nr = row, nc = col;
   if(e.key === 'Enter' || e.key === 'ArrowDown'){ nr++; }
   else if(e.key === 'ArrowUp'){ nr--; }
-  else if(e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length){ nc++; }
-  else if(e.key === 'ArrowLeft' && e.target.selectionStart === 0){ nc--; }
+  else if(e.key === 'ArrowRight'){ nc++; }
+  else if(e.key === 'ArrowLeft'){ nc--; }
   else if((e.ctrlKey||e.metaKey) && e.key==='z'){ e.preventDefault(); gridUndo(); return; }
   else return;
   if(nc < 0){ nc = GRID_COLS-1; nr--; }
