@@ -350,6 +350,8 @@ input[type=file]{display:none;}
   vertical-align:middle;color:var(--text-osc);font-weight:600;
   white-space:nowrap;
 }
+.cm-table th:nth-child(6),.cm-table td:nth-child(6){white-space:nowrap;}
+.cm-table th:last-child,.cm-table td:last-child{min-width:200px;width:240px;white-space:normal;}
 .cm-table tr:last-child td{border-bottom:none;}
 .cm-table tr:hover td{background:var(--gris-f);}
 
@@ -749,7 +751,7 @@ input[type=number]{-moz-appearance:textfield;}
      PÁGINA: CONTRAMUESTRAS
 ════════════════════════════════════════════ -->
 <div class="page" id="cmPage">
-  <div style="max-width:1100px;margin:0 auto;padding:28px 22px;">
+  <div style="max-width:1500px;margin:0 auto;padding:28px 22px;">
 
     <!-- Header de sección -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
@@ -2466,14 +2468,31 @@ async function saveCM(){
   toast(editId?'✅ Contramuestra actualizada':'✅ Contramuestra registrada');
 }
 
-// ── Desechar: solo disponible si está vencido ─────────────
+// ── Desechar: disponible para vencidos Y vigentes (con causa obligatoria) ──
 async function desecharCM(id){
   const cm=CM.find(c=>c.id===id);
-  if(!cm||getCMEstado(cm)!=='vencido') return;
-  if(!confirm(`¿Confirmar que la muestra ${cm.num} fue desechada?`)) return;
-  // Obtener la causa si ya fue ingresada en el campo
+  if(!cm||cm.desechado) return;
+  const estado=getCMEstado(cm);
+
+  // Obtener la causa del campo en pantalla
   const causaEl=document.getElementById('causa_'+id);
   const causa=causaEl?causaEl.value.trim():(cm.causa||'');
+
+  // Si está VIGENTE, la causa es obligatoria
+  if(estado==='vigente'){
+    if(!causa){
+      toast('⚠ Escribe el motivo de desecho antes de confirmar',true);
+      if(causaEl){ causaEl.focus(); causaEl.style.borderColor='var(--rojo)'; setTimeout(()=>causaEl.style.borderColor='',2000); }
+      return;
+    }
+    const etiquetaVenc=cm.fVenc?` (vence el ${fmtDL(cm.fVenc)})`:'';
+    if(!confirm(`⚠ Esta muestra aún está VIGENTE${etiquetaVenc}.\n\nMotivo declarado: "${causa}"\n\n¿Confirmar desecho anticipado de ${cm.num}?`)) return;
+  } else {
+    // Vencida: causa recomendada pero no bloqueante; avisar si está vacía
+    if(!causa && !confirm(`¿Confirmar que la muestra ${cm.num} fue desechada?\n\n(No se registró motivo de desecho)`)) return;
+    if(causa && !confirm(`¿Confirmar que la muestra ${cm.num} fue desechada?\n\nMotivo: "${causa}"`)) return;
+  }
+
   CM=CM.map(c=>c.id===id?{...c,desechado:true,causa}:c);
   saveCM_local();
   await updateDesecharDB(id,true,causa);
@@ -2551,15 +2570,15 @@ function renderCM(){
     const estado=getCMEstado(cm);
     const rowStyle=estado==='vencido'?'background:#fff5f5':estado==='desechado'?'opacity:.65':'';
 
-    // Botón desechar: solo activo si está VENCIDO
+    // Botón desechar: activo para VENCIDO y VIGENTE (con causa obligatoria para vigente)
     let btnDesechar='';
     if(estado==='desechado'){
       btnDesechar=`<button class="btn-desechar done" disabled>✓ Desechado</button>`;
     } else if(estado==='vencido'){
       btnDesechar=`<button class="btn-desechar" style="border-color:var(--rojo);color:var(--rojo);font-weight:700" onclick="desecharCM('${cm.id}')">🗑 Desechar</button>`;
     } else {
-      // Vigente: botón deshabilitado con tooltip explicativo
-      btnDesechar=`<button class="btn-desechar done" disabled title="Solo se puede desechar cuando la muestra está vencida" style="opacity:.35;cursor:not-allowed">🗑 Desechar</button>`;
+      // Vigente: botón activo pero requiere motivo obligatorio
+      btnDesechar=`<button class="btn-desechar" style="border-color:var(--naranja-osc);color:var(--naranja-osc);font-weight:700" title="Desecho anticipado — requiere motivo obligatorio" onclick="desecharCM('${cm.id}')">🗑 Desechar</button>`;
     }
 
     return `<tr style="${rowStyle}">
@@ -2577,14 +2596,17 @@ function renderCM(){
           ${btnDesechar}
         </div>
       </td>
-      <td style="min-width:120px;max-width:180px;white-space:normal">
+      <td>
         ${estado==='desechado'
           ? `<span style="font-size:11px;color:var(--gris-text)">${cm.causa||'—'}</span>`
           : estado==='vencido'
             ? `<input type="text" id="causa_${cm.id}" value="${cm.causa||''}" placeholder="Motivo de desecho..."
                 style="font-size:11px;padding:4px 6px;border:1.5px solid var(--gris-borde);border-radius:6px;width:100%;background:white;font-family:'Nunito',sans-serif;"
                 onchange="setCausaCM('${cm.id}', this.value)">`
-            : '<span style="font-size:11px;color:#ccc">—</span>'
+            : `<input type="text" id="causa_${cm.id}" value="${cm.causa||''}" placeholder="⚠ Motivo obligatorio..."
+                style="font-size:11px;padding:4px 6px;border:1.5px solid var(--naranja);border-radius:6px;width:100%;background:#FFFBF5;font-family:'Nunito',sans-serif;"
+                title="Si va a desechar una muestra vigente, el motivo es obligatorio"
+                onchange="setCausaCM('${cm.id}', this.value)">`
         }
       </td>
     </tr>`;
