@@ -2558,7 +2558,7 @@ function renderCM(){
   const alertList=document.getElementById('cmAlertList');
   if(vencidos.length){
     alertEl.classList.remove('hidden');
-    alertList.innerHTML=vencidos.map(c=>`· <b>${c.num}</b> — ${c.producto} · Lote: ${c.lote||'—'} · Venció el ${fmtDL(c.fVenc)}`).join('<br>');
+    alertList.innerHTML=vencidos.map(c=>`· <b>${c.producto}</b>${c.cantidad?` · <b>${c.cantidad}</b> uds`:''} · Lote: ${c.lote||'—'} · Venció el ${fmtDL(c.fVenc)}`).join('<br>');
   } else {
     alertEl.classList.add('hidden');
   }
