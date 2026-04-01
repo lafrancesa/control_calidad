@@ -875,7 +875,30 @@ input[type=number]{-moz-appearance:textfield;}
       </div>
     </div>
 
-    <label>Observaciones</label>
+    <div style="margin-top:12px;margin-bottom:2px;">
+      <div style="font-size:11px;color:var(--gris-text);font-family:'DM Mono',monospace;margin-bottom:6px;">Observaciones</div>
+      <div style="display:flex;gap:0;border:1.5px solid var(--gris-borde);border-radius:9px;overflow:hidden;margin-bottom:0;">
+        <button type="button" id="cmObsTab_analisis"
+          onclick="setCmObsTab('analisis')"
+          style="flex:1;padding:7px 4px;font-size:11px;font-weight:800;font-family:'Nunito',sans-serif;border:none;border-right:1px solid var(--gris-borde);cursor:pointer;transition:all .18s;background:var(--rojo);color:white;">
+          🔬 Análisis
+        </button>
+        <button type="button" id="cmObsTab_retencion"
+          onclick="setCmObsTab('retencion')"
+          style="flex:1;padding:7px 4px;font-size:11px;font-weight:800;font-family:'Nunito',sans-serif;border:none;border-right:1px solid var(--gris-borde);cursor:pointer;transition:all .18s;background:var(--gris-f);color:var(--gris-text);">
+          📦 Retención
+        </button>
+        <button type="button" id="cmObsTab_cuarentena"
+          onclick="setCmObsTab('cuarentena')"
+          style="flex:1;padding:7px 4px;font-size:11px;font-weight:800;font-family:'Nunito',sans-serif;border:none;cursor:pointer;transition:all .18s;background:var(--gris-f);color:var(--gris-text);">
+          🚫 Cuarentena
+        </button>
+      </div>
+      <textarea id="cmObs_analisis"   style="height:70px;resize:vertical;margin-top:0;border-top-left-radius:0;border-top-right-radius:0;border-top:none;display:block;"  placeholder="Notas de análisis..."></textarea>
+      <textarea id="cmObs_retencion"  style="height:70px;resize:vertical;margin-top:0;border-top-left-radius:0;border-top-right-radius:0;border-top:none;display:none;"  placeholder="Notas de retención..."></textarea>
+      <textarea id="cmObs_cuarentena" style="height:70px;resize:vertical;margin-top:0;border-top-left-radius:0;border-top-right-radius:0;border-top:none;display:none;" placeholder="Notas de cuarentena..."></textarea>
+    </div>
+    <label style="margin-top:10px;">Notas adicionales</label>
     <textarea id="cmObs" style="height:70px;resize:vertical" placeholder="Notas adicionales..."></textarea>
 
     <div class="modal-actions">
@@ -2422,6 +2445,23 @@ async function goContramuestras(){
   renderCM();
 }
 
+// ── Pestañas de observaciones en modal contramuestra ──────
+function setCmObsTab(tab){
+  ['analisis','retencion','cuarentena'].forEach(t=>{
+    const btn=document.getElementById('cmObsTab_'+t);
+    const ta=document.getElementById('cmObs_'+t);
+    if(t===tab){
+      btn.style.background='var(--rojo)';
+      btn.style.color='white';
+      ta.style.display='block';
+    } else {
+      btn.style.background='var(--gris-f)';
+      btn.style.color='var(--gris-text)';
+      ta.style.display='none';
+    }
+  });
+}
+
 // ── Abrir modal nueva contramuestra (sin contraseña) ──────
 function openModalCM(){
   document.getElementById('cmEditId').value='';
@@ -2430,6 +2470,8 @@ function openModalCM(){
   document.getElementById('cmNum').value='';
   // Limpiar campos
   ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).value='');
+  ['cmObs_analisis','cmObs_retencion','cmObs_cuarentena'].forEach(i=>document.getElementById(i).value='');
+  setCmObsTab('analisis');
   // Todos los campos habilitados para llenado libre
   ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).disabled=false);
   // Poblar datalist con nombres de galletas en orden alfabético
@@ -2462,7 +2504,11 @@ function openModalCMEdit(id){
   document.getElementById('cmFProd').value=r.fProd||'';
   document.getElementById('cmFVenc').value=r.fVenc||'';
   document.getElementById('cmCantidad').value=r.cantidad||'';
+  document.getElementById('cmObs_analisis').value=r.obsAnalisis||'';
+  document.getElementById('cmObs_retencion').value=r.obsRetencion||'';
+  document.getElementById('cmObs_cuarentena').value=r.obsCuarentena||'';
   document.getElementById('cmObs').value=r.obs||'';
+  setCmObsTab('analisis');
   ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).disabled=false);
   openM('modalCM');
 }
@@ -2481,6 +2527,9 @@ async function saveCM(){
     fVenc: document.getElementById('cmFVenc').value||null,
     cantidad: document.getElementById('cmCantidad').value.trim(),
     obs: document.getElementById('cmObs').value.trim(),
+    obsAnalisis:   document.getElementById('cmObs_analisis').value.trim(),
+    obsRetencion:  document.getElementById('cmObs_retencion').value.trim(),
+    obsCuarentena: document.getElementById('cmObs_cuarentena').value.trim(),
     desechado: existing?.desechado||false,
     causa: existing?.causa||'',
     createdAt: existing?.createdAt||new Date().toISOString()
