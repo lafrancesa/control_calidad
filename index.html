@@ -763,6 +763,7 @@ input[type=number]{-moz-appearance:textfield;}
         </div>
       </div>
       <button class="btn btn-primary" onclick="openModalCM()">➕ Nueva Contramuestra</button>
+      <button class="btn btn-secondary" onclick="openModalGestionProductos()" title="Agregar tipos de galleta que no están en el registro de pesos" style="border-color:var(--naranja);color:var(--naranja-osc)">🍪 Gestionar productos</button>
     </div>
 
     <!-- Alerta de vencidos -->
@@ -2392,9 +2393,40 @@ function toast(msg,isErr=false){
 let CM = [];
 let cmFilter = 'todos';
 let _cmEditPendingId = null; // id pendiente de editar tras contraseña
+let CM_EXTRA_PRODUCTOS = []; // galletas extra que no están en el registro de pesos
+
+function loadCMExtraProductos(){
+  try{ const s=localStorage.getItem('qc_cm_extra_productos'); if(s) CM_EXTRA_PRODUCTOS=JSON.parse(s); }catch(e){ CM_EXTRA_PRODUCTOS=[]; }
+}
+function saveCMExtraProductos(){
+  localStorage.setItem('qc_cm_extra_productos', JSON.stringify(CM_EXTRA_PRODUCTOS));
+}
+function getAllCMProductos(){
+  // Combina galletas del registro de pesos + extras, sin duplicados, ordenadas alfabéticamente
+  const fromCookies = Object.values(S.cookies).map(c=>c.name);
+  const all = [...new Set([...fromCookies, ...CM_EXTRA_PRODUCTOS])];
+  return all.sort((a,b)=>a.localeCompare(b,'es'));
+}
+function addCMExtraProducto(nombre){
+  const n = nombre.trim();
+  if(!n) return false;
+  // No agregar si ya existe en las galletas del registro o en extras
+  if(getAllCMProductos().map(x=>x.toLowerCase()).includes(n.toLowerCase())){
+    toast('⚠ Ese producto ya existe en la lista',true);
+    return false;
+  }
+  CM_EXTRA_PRODUCTOS.push(n);
+  saveCMExtraProductos();
+  return true;
+}
+function removeCMExtraProducto(nombre){
+  CM_EXTRA_PRODUCTOS = CM_EXTRA_PRODUCTOS.filter(p=>p!==nombre);
+  saveCMExtraProductos();
+}
 
 function loadCM(){
   try{ const s=localStorage.getItem('qc_contramuestras'); if(s) CM=JSON.parse(s); }catch(e){ CM=[]; }
+  loadCMExtraProductos();
 }
 function saveCM_local(){
   localStorage.setItem('qc_contramuestras', JSON.stringify(CM));
@@ -2410,6 +2442,7 @@ function nextCMNum(){
 // Supabase
 async function loadCMFromSupabase(){
   if(!SUPABASE_CONFIGURED){ loadCM(); return; }
+  loadCMExtraProductos();
   try{
     const {data,error}=await _supa.from('contramuestras').select('*').order('created_at',{ascending:true});
     if(error){ loadCM(); return; }
@@ -2474,13 +2507,106 @@ function openModalCM(){
   setCmObsTab('analisis');
   // Todos los campos habilitados para llenado libre
   ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).disabled=false);
-  // Poblar datalist con nombres de galletas en orden alfabético
+  // Poblar datalist con todas las galletas (registro + extras) en orden alfabético
+  populateCmProductoList();
+  openM('modalCM');
+}
+
+// ── Poblar datalist de productos ──────────────────────────
+function populateCmProductoList(){
   const dl=document.getElementById('cmProductoList');
   if(dl){
-    const nombres=Object.values(S.cookies).map(c=>c.name).sort((a,b)=>a.localeCompare(b,'es'));
-    dl.innerHTML=nombres.map(n=>`<option value="${n}">`).join('');
+    const nombres=getAllCMProductos();
+    dl.innerHTML=nombres.map(n=>`<option value="${escHtml(n)}">`).join('');
   }
-  openM('modalCM');
+}
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Modal para gestionar productos extra ─────────────────
+function openModalGestionProductos(){
+  // Crear modal dinámico si no existe
+  let m=document.getElementById('_modalGestionProd');
+  if(!m){
+    m=document.createElement('div');
+    m.className='modal';
+    m.id='_modalGestionProd';
+    document.body.appendChild(m);
+  }
+  renderModalGestionProductos(m);
+  m.classList.add('show');
+}
+function renderModalGestionProductos(m){
+  const fromCookies=Object.values(S.cookies).map(c=>c.name).sort((a,b)=>a.localeCompare(b,'es'));
+  const extras=[...CM_EXTRA_PRODUCTOS].sort((a,b)=>a.localeCompare(b,'es'));
+  m.innerHTML=`<div class="modal-box" style="max-width:500px">
+    <div class="modal-title">🍪 Gestionar Productos de Contramuestra</div>
+    <p style="font-size:12px;color:var(--gris-text);margin-bottom:14px;font-family:'DM Mono',monospace">
+      Agrega tipos de galleta que no están en el Registro de Pesos para usarlos en las contramuestras.
+    </p>
+
+    <!-- Agregar nuevo -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:flex-end;">
+      <div style="flex:1;">
+        <label style="margin-top:0">Nuevo producto</label>
+        <input type="text" id="_newProdInput" placeholder="Ej: Galleta Vainilla Premium"
+          onkeydown="if(event.key==='Enter')addProdFromModal()"
+          style="margin-bottom:0">
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="addProdFromModal()" style="white-space:nowrap;flex-shrink:0">➕ Agregar</button>
+    </div>
+
+    <!-- Lista de extras -->
+    <div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--rojo);margin-bottom:8px;border-bottom:2px solid var(--naranja);padding-bottom:4px">
+        Productos extra agregados (${extras.length})
+      </div>
+      ${extras.length===0
+        ? `<div style="color:var(--gris-text);font-size:12px;padding:10px 0;font-family:'DM Mono',monospace">Ninguno aún — agrega uno arriba</div>`
+        : extras.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border:1.5px solid var(--gris-borde);border-radius:8px;margin-bottom:5px;background:var(--gris-f)">
+            <span style="font-size:13px;font-weight:700">${escHtml(p)}</span>
+            <button onclick="removeProdFromModal('${escHtml(p)}')" title="Eliminar" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--rojo);padding:0 4px;line-height:1;opacity:.7;transition:.15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.7">🗑</button>
+          </div>`).join('')
+      }
+    </div>
+
+    <!-- Lista de cookies del registro (solo lectura, informativa) -->
+    <details style="margin-bottom:8px">
+      <summary style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--gris-text);cursor:pointer;padding:6px 0">
+        📋 Del Registro de Pesos (${fromCookies.length}) — solo lectura
+      </summary>
+      <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px">
+        ${fromCookies.map(p=>`<span style="background:white;border:1.5px solid var(--gris-borde);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;color:var(--gris-text)">${escHtml(p)}</span>`).join('')||'<span style="color:var(--gris-text);font-size:12px">Ninguna registrada</span>'}
+      </div>
+    </details>
+
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModalGestionProductos()">✅ Listo</button>
+    </div>
+  </div>`;
+}
+function addProdFromModal(){
+  const inp=document.getElementById('_newProdInput');
+  if(!inp) return;
+  const ok=addCMExtraProducto(inp.value);
+  if(ok){
+    inp.value='';
+    toast('✅ Producto agregado a la lista');
+    const m=document.getElementById('_modalGestionProd');
+    if(m) renderModalGestionProductos(m);
+    populateCmProductoList();
+  }
+}
+function removeProdFromModal(nombre){
+  if(!confirm(`¿Eliminar "${nombre}" de la lista de productos extra?`)) return;
+  removeCMExtraProducto(nombre);
+  const m=document.getElementById('_modalGestionProd');
+  if(m) renderModalGestionProductos(m);
+  populateCmProductoList();
+  toast('🗑 Producto eliminado');
+}
+function closeModalGestionProductos(){
+  const m=document.getElementById('_modalGestionProd');
+  if(m) m.classList.remove('show');
 }
 
 // ── Editar: pide contraseña primero ───────────────────────
@@ -2510,6 +2636,7 @@ function openModalCMEdit(id){
   document.getElementById('cmObs').value=r.obs||'';
   setCmObsTab('analisis');
   ['cmProducto','cmLote','cmFProd','cmFVenc','cmCantidad','cmObs'].forEach(i=>document.getElementById(i).disabled=false);
+  populateCmProductoList();
   openM('modalCM');
 }
 
