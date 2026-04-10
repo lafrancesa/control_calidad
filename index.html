@@ -2548,7 +2548,7 @@ function renderModalGestionProductos(m){
     <div style="display:flex;gap:8px;margin-bottom:16px;align-items:flex-end;">
       <div style="flex:1;">
         <label style="margin-top:0">Nuevo producto</label>
-        <input type="text" id="_newProdInput" placeholder="Ej: Galleta Vainilla Premium"
+        <input type="text" id="_newProdInput" placeholder="Ej: Galleta Vainilla"
           onkeydown="if(event.key==='Enter')addProdFromModal()"
           style="margin-bottom:0">
       </div>
@@ -2572,7 +2572,7 @@ function renderModalGestionProductos(m){
     <!-- Lista de cookies del registro (solo lectura, informativa) -->
     <details style="margin-bottom:8px">
       <summary style="font-size:10px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--gris-text);cursor:pointer;padding:6px 0">
-        📋 Del Registro de Pesos (${fromCookies.length}) — solo lectura
+        📋 Del Registro de Pesos
       </summary>
       <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px">
         ${fromCookies.map(p=>`<span style="background:white;border:1.5px solid var(--gris-borde);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;color:var(--gris-text)">${escHtml(p)}</span>`).join('')||'<span style="color:var(--gris-text);font-size:12px">Ninguna registrada</span>'}
